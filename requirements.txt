@@ -1,0 +1,8 @@
+crewai
+crewai-tools  
+langchain-groq
+streamlit
+python-dotenv
+pandas
+reportlab
+pydantic
