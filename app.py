@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from tasks.core_tasks import build_core_tasks
 from tasks.niche_tasks import build_niche_tasks
 from tasks.tune_up_tasks import build_tune_up_tasks
+from services.flights import search_flights_oneway, search_flights_roundtrip, format_flight_options
 
 from agents.core_agents import (
     destination_researcher,
@@ -25,9 +26,171 @@ from agents.niche_agents import (
     medical_tourism_planner,
     luxury_on_budget_finder,
     visa_requirements_advisor,
+    flight_advisor,
 )
 
 load_dotenv()
+
+
+# =====================================================
+# AIRPORT SEARCH HELPER
+# =====================================================
+COMMON_AIRPORTS = {
+    "NBO": "Nairobi, Kenya",
+    "JNB": "Johannesburg, South Africa",
+    "CPT": "Cape Town, South Africa",
+    "DXB": "Dubai, UAE",
+    "AMS": "Amsterdam, Netherlands",
+    "LHR": "London Heathrow, UK",
+    "CDG": "Paris, France",
+    "FCO": "Rome, Italy",
+    "MAD": "Madrid, Spain",
+    "BCN": "Barcelona, Spain",
+    "ORY": "Paris Orly, France",
+    "MUC": "Munich, Germany",
+    "ZRH": "Zurich, Switzerland",
+    "VIE": "Vienna, Austria",
+    "PRG": "Prague, Czech Republic",
+    "LAX": "Los Angeles, USA",
+    "JFK": "New York JFK, USA",
+    "EWR": "Newark, USA",
+    "ORD": "Chicago, USA",
+    "MIA": "Miami, USA",
+    "SFO": "San Francisco, USA",
+    "SEA": "Seattle, USA",
+    "TOR": "Toronto, Canada",
+    "YVR": "Vancouver, Canada",
+    "SYD": "Sydney, Australia",
+    "MEL": "Melbourne, Australia",
+    "BKK": "Bangkok, Thailand",
+    "SIN": "Singapore",
+    "HKG": "Hong Kong",
+    "NRT": "Tokyo Narita, Japan",
+    "ICN": "Seoul Incheon, South Korea",
+    "BLR": "Bangalore, India",
+    "DEL": "New Delhi, India",
+    "BOM": "Mumbai, India",
+    "MLE": "Malé, Maldives",
+    "CMB": "Colombo, Sri Lanka",
+    "KUL": "Kuala Lumpur, Malaysia",
+    "PEK": "Beijing, China",
+    "PVG": "Shanghai, China",
+    "CAN": "Guangzhou, China",
+    "PKG": "Bangkok, Thailand",
+    "MNL": "Manila, Philippines",
+    "HAN": "Hanoi, Vietnam",
+    "SGN": "Ho Chi Minh City, Vietnam",
+    "CTS": "Sapporo, Japan",
+    "KIX": "Osaka, Japan",
+    "BKI": "Kota Kinabalu, Malaysia",
+    "PHC": "Phnom Penh, Cambodia",
+    "VTE": "Vientiane, Laos",
+    "RGN": "Yangon, Myanmar",
+}
+
+# String constants to avoid duplication
+CUSTOM_DESTINATION = "Custom destination"
+CLOSING_DIV = "</div>"
+OPENING_ITINERARY_CARD = '<div class="itinerary-card">'
+ITINERARY_VIEW_LABEL = "Smooth Landing view (formatted)"
+EDIT_TEXT_LABEL = "#### Edit text (optional)"
+PARIS_FRANCE = "Paris, France"
+
+
+def search_airports(search_term: str):
+    """Search airports by code or city name."""
+    if not search_term:
+        return []
+    
+    search_term_lower = search_term.lower()
+    matches = []
+    
+    for code, city in COMMON_AIRPORTS.items():
+        if search_term_lower in code.lower() or search_term_lower in city.lower():
+            matches.append(f"{code} - {city}")
+    
+    return sorted(matches)
+
+
+def parse_airport_selection(selection: str) -> str:
+    """Extract IATA code from formatted selection (e.g., 'NBO - Nairobi, Kenya')."""
+    if not selection:
+        return ""
+    return selection.split(" - ")[0]
+
+
+def _pull_core_to_tune():
+    """Callback to pull core itinerary into tune tab."""
+    st.session_state.tune_itinerary = st.session_state.get("core_itinerary", "")
+
+
+# =====================================================
+
+def _run_niche_overlays(destination, budget, days, interests, profile_flags, start_date, passport_country, trip_purpose, home_airport, core_itinerary):
+    """Generate niche overlays and store in session state."""
+    if not core_itinerary.strip():
+        st.error("Generate or paste a core itinerary first.")
+        return
+
+    with st.status("Layering in Smooth Landing extras…", expanded=False) as status:
+        status.write("Preparing niche tasks based on your profile switches…")
+        niche_tasks = build_niche_tasks(
+            destination,
+            budget,
+            int(days),
+            interests,
+            profile_flags,
+            start_date,
+            passport_country,
+            trip_purpose,
+            home_airport,
+        )
+
+        niche_agents = []
+        if profile_flags["safari"]:
+            niche_agents.append(safari_specialist)
+        if profile_flags["halal"]:
+            niche_agents.append(halal_travel_expert)
+        if profile_flags["nomad"]:
+            niche_agents.append(digital_nomad_planner)
+        # safety agent always added (solo_female branch or general)
+        niche_agents.append(solo_female_safety_advisor)
+        if profile_flags["family"]:
+            niche_agents.append(family_travel_designer)
+        if profile_flags["medical"]:
+            niche_agents.append(medical_tourism_planner)
+        if profile_flags["luxury"]:
+            niche_agents.append(luxury_on_budget_finder)
+        if profile_flags["visa"] and passport_country.strip():
+            niche_agents.append(visa_requirements_advisor)
+        if profile_flags["flights"] and home_airport.strip():
+            niche_agents.append(flight_advisor)
+
+        if not niche_agents:
+            status.update(
+                label="No overlays selected.",
+                state="error",
+                expanded=False,
+            )
+            st.error("Please switch on at least one Smooth Landing profile above.")
+        else:
+            status.write("Calling in the specialists…")
+            crew = Crew(
+                agents=niche_agents,
+                tasks=niche_tasks,
+                verbose=False,
+            )
+
+            niche_result = crew.kickoff()
+            niche_text = _to_text(niche_result)
+
+            status.update(
+                label="Smooth Landing overlays ready ✅",
+                state="complete",
+                expanded=False,
+            )
+
+            st.session_state.niche_itinerary = niche_text
 
 
 def _to_text(result):
@@ -144,8 +307,7 @@ with col_title:
 
 st.markdown("---")
 
-tab1, tab2 = st.tabs(["Plan a new trip", "Tune an existing trip"])
-
+tab1, tab2, tab3 = st.tabs(["Plan a new trip", "Tune an existing trip", "Find flights"])
 
 # -------------------------
 # TAB 1: CORE PLANNING + ITERATION
@@ -160,12 +322,26 @@ with tab1:
 
         col1, col2 = st.columns(2)
         with col1:
-            new_destination = st.text_input(
+            # Destination - searchable from common airports
+            airport_options = sorted(COMMON_AIRPORTS.values()) + [CUSTOM_DESTINATION]
+            destination_display = st.selectbox(
                 "Destination",
-                "Paris, France",
-                key="new_dest",
-                help="City and country or region you want to explore.",
+                options=airport_options,
+                index=24,  # Paris by default
+                key="dest_select_box",
+                help="Select from popular destinations or choose 'Custom' to enter manually.",
             )
+            
+            if destination_display == CUSTOM_DESTINATION:
+                new_destination = st.text_input(
+                    "Enter custom destination",
+                    PARIS_FRANCE,
+                    key="new_dest",
+                    help="City and country or region you want to explore.",
+                )
+            else:
+                new_destination = destination_display
+            
             new_start_date = st.date_input(
                 "Start date",
                 value=datetime.date.today(),
@@ -206,6 +382,24 @@ with tab1:
             placeholder="Mid‑range budget, hates hostels, loves food tours, avoid nightlife…",
         )
 
+        will_fly = st.checkbox(
+            "I’ll be flying to this destination",
+            value=True,
+            key="will_fly",
+        )
+
+        # Home airport - searchable selectbox
+        airport_codes_with_cities = [f"{code} - {city}" for code, city in COMMON_AIRPORTS.items()]
+        home_airport_selection = st.selectbox(
+            "Home airport (IATA code)",
+            options=airport_codes_with_cities,
+            index=0,  # NBO first
+            key="home_airport_select",
+            help="Select your home airport for flight-aware planning.",
+        )
+        home_airport = parse_airport_selection(home_airport_selection)
+
+
         st.markdown("##### Traveller identity & visa context")
         col_id1, col_id2 = st.columns(2)
         with col_id1:
@@ -222,7 +416,7 @@ with tab1:
                 key="trip_purpose",
             )
 
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(CLOSING_DIV, unsafe_allow_html=True)
 
     st.write("")
     st.markdown("#### Optional Smooth Landing profile")
@@ -236,10 +430,15 @@ with tab1:
         new_nomad = st.toggle("Digital nomad", key="new_nomad")
         new_solo_f = st.toggle("Solo female safety", key="new_solo_f")
     with col_n3:
-        new_family = st.toggle("Family with kids", key="new_family")
+        # Hide family option when solo female travel is selected
+        if not new_solo_f:
+            new_family = st.toggle("Family with kids", key="new_family")
+        else:
+            new_family = False
         new_medical = st.toggle("Medical tourism", key="new_medical")
     new_luxury = st.toggle("Luxury on a budget", key="new_luxury")
     new_visa = st.toggle("Visa & entry requirements", key="new_visa")
+    new_flights = st.toggle("Flight advisor", key="new_flights")
 
     profile_flags = {
         "safari": new_safari,
@@ -250,13 +449,16 @@ with tab1:
         "medical": new_medical,
         "luxury": new_luxury,
         "visa": new_visa,
+        "flights": new_flights,
     }
 
     st.markdown("---")
 
-    # Initialize session state for core itinerary
+    # Initialize session state for core and niche itineraries
     if "core_itinerary" not in st.session_state:
         st.session_state.core_itinerary = ""
+    if "niche_itinerary" not in st.session_state:
+        st.session_state.niche_itinerary = ""
 
     col_core_header, col_core_button = st.columns([3, 1])
     with col_core_header:
@@ -274,6 +476,7 @@ with tab1:
                     new_traveller_type,
                     new_raw_preferences,
                     new_start_date,
+                    will_fly = will_fly,
                 )
 
                 core_agents = [
@@ -306,13 +509,13 @@ with tab1:
 
     # Core itinerary display + editable notebook
     if st.session_state.core_itinerary.strip():
-        with st.expander("Smooth Landing view (formatted)", expanded=True):
+        with st.expander(ITINERARY_VIEW_LABEL, expanded=True):
             st.markdown(st.session_state.core_itinerary, unsafe_allow_html=False)
     else:
         st.info("Generate a core itinerary to see your Smooth Landing view here.")
 
-    st.markdown("#### Edit text (optional)")
-    st.markdown('<div class="itinerary-card">', unsafe_allow_html=True)
+    st.markdown(EDIT_TEXT_LABEL)
+    st.markdown(OPENING_ITINERARY_CARD, unsafe_allow_html=True)
     st.text_area(
         "",
         key="core_itinerary",
@@ -320,7 +523,7 @@ with tab1:
         placeholder="Your day‑by‑day Smooth Landing plan will appear here once you generate the core itinerary.",
         label_visibility="collapsed",
     )
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown(CLOSING_DIV, unsafe_allow_html=True)
 
     st.markdown("### Add Smooth Landing overlays")
     st.caption("Run a lighter pass to add extra calm – safety, halal options, family tweaks, visa notes and more.")
@@ -329,65 +532,25 @@ with tab1:
         if not st.session_state.core_itinerary.strip():
             st.error("Generate or paste a core itinerary first.")
         else:
-            with st.status("Layering in Smooth Landing extras…", expanded=False) as status:
-                status.write("Preparing niche tasks based on your profile switches…")
-                niche_tasks = build_niche_tasks(
-                    new_destination,
-                    new_budget,
-                    int(new_days),
-                    new_interests,
-                    profile_flags,
-                    new_start_date,
-                    passport_country,
-                    trip_purpose,
-                )
+            _run_niche_overlays(
+                new_destination,
+                new_budget,
+                int(new_days),
+                new_interests,
+                profile_flags,
+                new_start_date,
+                passport_country,
+                trip_purpose,
+                home_airport,
+                st.session_state.core_itinerary,
+            )
 
-                niche_agents = []
-                if profile_flags["safari"]:
-                    niche_agents.append(safari_specialist)
-                if profile_flags["halal"]:
-                    niche_agents.append(halal_travel_expert)
-                if profile_flags["nomad"]:
-                    niche_agents.append(digital_nomad_planner)
-                # safety agent always added (solo_female branch or general)
-                niche_agents.append(solo_female_safety_advisor)
-                if profile_flags["family"]:
-                    niche_agents.append(family_travel_designer)
-                if profile_flags["medical"]:
-                    niche_agents.append(medical_tourism_planner)
-                if profile_flags["luxury"]:
-                    niche_agents.append(luxury_on_budget_finder)
-                if profile_flags["visa"] and passport_country.strip():
-                    niche_agents.append(visa_requirements_advisor)
-
-                if not niche_agents:
-                    status.update(
-                        label="No overlays selected.",
-                        state="error",
-                        expanded=False,
-                    )
-                    st.error("Please switch on at least one Smooth Landing profile above.")
-                else:
-                    status.write("Calling in the specialists…")
-                    crew = Crew(
-                        agents=niche_agents,
-                        tasks=niche_tasks,
-                        verbose=False,
-                    )
-
-                    niche_result = crew.kickoff()
-                    niche_text = _to_text(niche_result)
-
-                    status.update(
-                        label="Smooth Landing overlays ready ✅",
-                        state="complete",
-                        expanded=False,
-                    )
-
-                    st.markdown("#### Smooth Landing overlay suggestions")
-                    with st.expander("View overlays (formatted)", expanded=True):
-                        st.markdown(niche_text, unsafe_allow_html=False)
-                    st.caption("Copy any parts you like into your core itinerary above, then regenerate or tune.")
+    # Display niche overlays
+    if st.session_state.niche_itinerary.strip():
+        st.markdown("#### Smooth Landing overlay suggestions")
+        with st.expander("View overlays (formatted)", expanded=True):
+            st.markdown(st.session_state.niche_itinerary, unsafe_allow_html=False)
+        st.caption("Copy any parts you like into your core itinerary above, then regenerate or tune.")
 
 
 # -----------------------------
@@ -399,13 +562,19 @@ with tab2:
 
     if "tune_itinerary" not in st.session_state:
         st.session_state.tune_itinerary = ""
+    if "tune_result" not in st.session_state:
+        st.session_state.tune_result = ""
 
     col_tune_top = st.columns([2, 1])
     with col_tune_top[0]:
         st.markdown("#### Your current plan")
     with col_tune_top[1]:
-        if st.button("Use core itinerary from Tab 1", key="btn_pull_core", use_container_width=True):
-            st.session_state.tune_itinerary = st.session_state.get("core_itinerary", "")
+        st.button(
+            "Use core itinerary from Tab 1",
+            key="btn_pull_core",
+            use_container_width=True,
+            on_click=_pull_core_to_tune,
+        )
 
     st.text_area(
         "Paste or edit your itinerary for tune‑up",
@@ -417,11 +586,22 @@ with tab2:
     st.markdown("#### Trip context")
     col_ct1, col_ct2, col_ct3 = st.columns(3)
     with col_ct1:
-        tune_destination = st.text_input(
+        # Tune destination with airport search
+        tune_destination_display = st.selectbox(
             "Destination",
-            "Paris, France",
-            key="tune_dest",
+            options=sorted(COMMON_AIRPORTS.values()) + [CUSTOM_DESTINATION],
+            index=24,  # Paris by default
+            key="tune_dest_select",
         )
+        
+        if tune_destination_display == CUSTOM_DESTINATION:
+            tune_destination = st.text_input(
+                "Enter custom destination",
+                PARIS_FRANCE,
+                key="tune_dest_input",
+            )
+        else:
+            tune_destination = tune_destination_display
     with col_ct2:
         tune_budget = st.number_input(
             "Approx total budget (USD)",
@@ -495,18 +675,174 @@ with tab2:
             st.success("Your trip just got a Smooth Landing ✨")
             st.markdown("#### Tuned‑up itinerary and notes")
 
-            st.session_state.tune_itinerary = result_text
+            # Store result in a separate key to avoid widget binding conflict
+            st.session_state.tune_result = result_text
 
             # Formatted view
-            with st.expander("Smooth Landing view (formatted)", expanded=True):
-                st.markdown(st.session_state.tune_itinerary, unsafe_allow_html=False)
+            with st.expander(ITINERARY_VIEW_LABEL, expanded=True):
+                st.markdown(st.session_state.tune_result, unsafe_allow_html=False)
 
-            st.markdown("#### Edit text (optional)")
-            st.markdown('<div class="itinerary-card">', unsafe_allow_html=True)
+            st.markdown(EDIT_TEXT_LABEL)
+            st.markdown(OPENING_ITINERARY_CARD, unsafe_allow_html=True)
             st.text_area(
                 "",
-                key="tune_itinerary",
+                value=st.session_state.tune_result,
                 height=350,
                 label_visibility="collapsed",
+                disabled=True,
             )
-            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown(CLOSING_DIV, unsafe_allow_html=True)
+
+    # Display existing tune result if it exists (when navigating back to tab)
+    elif st.session_state.tune_result.strip():
+        st.markdown("#### Previous tune‑up results")
+        with st.expander(ITINERARY_VIEW_LABEL, expanded=True):
+            st.markdown(st.session_state.tune_result, unsafe_allow_html=False)
+
+        st.markdown(EDIT_TEXT_LABEL)
+        st.markdown(OPENING_ITINERARY_CARD, unsafe_allow_html=True)
+        st.text_area(
+            "",
+            value=st.session_state.tune_result,
+            height=350,
+            label_visibility="collapsed",
+            disabled=True,
+        )
+        st.markdown(CLOSING_DIV, unsafe_allow_html=True)
+
+# -----------------------------
+# TAB 3: FLIGHT SEARCH (SKYSCANNER)
+# -----------------------------
+with tab3:
+    st.subheader("Find flights for your Smooth Landing")
+    st.caption("Quickly check a few flight options and prices for your trip dates.")
+
+    trip_type = st.radio(
+        "Trip type",
+        ["One‑way", "Return"],
+        horizontal=True,
+        key="flight_trip_type",
+    )
+
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        flight_origin_selection = st.selectbox(
+            "From (airport)",
+            options=airport_codes_with_cities,
+            index=0,
+            key="flight_origin_select",
+        )
+        flight_origin = parse_airport_selection(flight_origin_selection)
+    with col_f2:
+        flight_destination_selection = st.selectbox(
+            "To (airport)",
+            options=airport_codes_with_cities,
+            index=24,  # Paris
+            key="flight_destination_select",
+            help="You can pick your trip destination here.",
+        )
+        flight_destination = parse_airport_selection(flight_destination_selection)
+
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        flight_depart_date = st.date_input(
+            "Departure date",
+            value=st.session_state.get("new_start_date", datetime.date.today()),
+            key="flight_depart_date",
+        )
+    with col_d2:
+        flight_adults = st.number_input(
+            "Adults",
+            min_value=1,
+            max_value=9,
+            value=1,
+            step=1,
+            key="flight_adults",
+        )
+
+    return_date = None
+    if trip_type == "Return":
+        return_date = st.date_input(
+            "Return date",
+            value=flight_depart_date,
+            key="flight_return_date",
+        )
+
+    st.caption("Skyscanner data is indicative only – always confirm details and prices before booking.")
+
+    if st.button("Search flights", key="btn_search_flights"):
+        if not flight_origin or not flight_destination:
+            st.error("Please enter both origin and destination (IATA codes work best, e.g. NBO, CDG).")
+        else:
+            with st.status("Checking Skyscanner for options…", expanded=False) as status:
+                try:
+                    if trip_type == "Return" and return_date:
+                        # Search round-trip
+                        flight_results = search_flights_roundtrip(
+                            origin=flight_origin,
+                            destination=flight_destination,
+                            outbound_date=flight_depart_date,
+                            return_date=return_date,
+                            adults=int(flight_adults),
+                        )
+                        outbound_options = flight_results.get("outbound", [])
+                        inbound_options = flight_results.get("return", [])
+                    else:
+                        # Search one-way only
+                        outbound_options = search_flights_oneway(
+                            origin=flight_origin,
+                            destination=flight_destination,
+                            date=flight_depart_date,
+                            adults=int(flight_adults),
+                        )
+                        inbound_options = []
+                except Exception as e:
+                    status.update(
+                        label="Flight search failed",
+                        state="error",
+                        expanded=True,
+                    )
+                    st.error(f"Could not fetch flights right now: {e}")
+                else:
+                    status.update(
+                        label="Flight options ready ✅",
+                        state="complete",
+                        expanded=False,
+                    )
+
+                    # Display outbound flights
+                    if not outbound_options or (isinstance(outbound_options, dict) and "error" in outbound_options):
+                        st.warning("No outbound flights found. Try different dates or airports.")
+                    else:
+                        st.markdown("### ✈️ Outbound flights")
+                        for i, opt in enumerate(outbound_options, start=1):
+                            col1, col2, col3 = st.columns([2, 2, 1])
+                            with col1:
+                                st.markdown(f"**{opt.get('airline', 'Airline')}**")
+                            with col2:
+                                st.markdown(f"{opt.get('departure', 'N/A')} → {opt.get('arrival', 'N/A')}")
+                            with col3:
+                                st.markdown(f"**{opt.get('currency', '')} {opt.get('price', 'N/A')}**")
+                            st.caption(f"{opt.get('duration_minutes', 'N/A')} min • {opt.get('stops', 0)} stop(s)")
+                            if opt.get("deeplink"):
+                                st.link_button("Book on Skyscanner", opt["deeplink"], key=f"out_{i}")
+                            st.divider()
+
+                    # Display return flights if round-trip
+                    if trip_type == "Return":
+                        if not inbound_options or (isinstance(inbound_options, dict) and "error" in inbound_options):
+                            st.info("No return flights found for the chosen date. You can still book a one‑way outbound.")
+                        else:
+                            st.markdown("### ✈️ Return flights")
+                            for i, opt in enumerate(inbound_options, start=1):
+                                col1, col2, col3 = st.columns([2, 2, 1])
+                                with col1:
+                                    st.markdown(f"**{opt.get('airline', 'Airline')}**")
+                                with col2:
+                                    st.markdown(f"{opt.get('departure', 'N/A')} → {opt.get('arrival', 'N/A')}")
+                                with col3:
+                                    st.markdown(f"**{opt.get('currency', '')} {opt.get('price', 'N/A')}**")
+                                st.caption(f"{opt.get('duration_minutes', 'N/A')} min • {opt.get('stops', 0)} stop(s)")
+                                if opt.get("deeplink"):
+                                    st.link_button("Book on Skyscanner", opt["deeplink"], key=f"ret_{i}")
+                                st.divider()

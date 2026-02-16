@@ -3,8 +3,11 @@
 import os
 import datetime
 from typing import List
+from functools import wraps
 from dotenv import load_dotenv
 from crewai_tools import SerperDevTool
+from crewai.tools import BaseTool
+from services.flights import search_flights_oneway, search_flights_roundtrip, format_flight_options
 
 load_dotenv()
 
@@ -20,6 +23,44 @@ web_search = SerperDevTool(
     # api_key=serper_api_key,
     # save_file=False,
 )
+
+# =====================================================
+# CUSTOM CREWAI TOOLS: FLIGHT SEARCH
+# =====================================================
+
+class SearchFlightsOnewayTool(BaseTool):
+    name: str = "search_flights_oneway"
+    description: str = "Search one-way flights between two airports on a specific date using Skyscanner API"
+    
+    def _run(self, origin: str, destination: str, date: str, adults: int = 1, currency: str = "USD") -> str:
+        """Execute the one-way flight search"""
+        result = search_flights_oneway(origin, destination, date, adults, currency)
+        if isinstance(result, dict) and "error" in result:
+            return str(result)
+        return str(result)
+    
+    async def _arun(self, origin: str, destination: str, date: str, adults: int = 1, currency: str = "USD") -> str:
+        """Async version of the one-way flight search"""
+        return self._run(origin, destination, date, adults, currency)
+
+
+class SearchFlightsRoundtripTool(BaseTool):
+    name: str = "search_flights_roundtrip"
+    description: str = "Search round-trip flights (outbound and return) between two airports using Skyscanner API"
+    
+    def _run(self, origin: str, destination: str, outbound_date: str, return_date: str, adults: int = 1, currency: str = "USD") -> str:
+        """Execute the round-trip flight search"""
+        result = search_flights_roundtrip(origin, destination, outbound_date, return_date, adults, currency)
+        return str(result)
+    
+    async def _arun(self, origin: str, destination: str, outbound_date: str, return_date: str, adults: int = 1, currency: str = "USD") -> str:
+        """Async version of the round-trip flight search"""
+        return self._run(origin, destination, outbound_date, return_date, adults, currency)
+
+
+# Instantiate the custom tools
+flights_oneway_tool = SearchFlightsOnewayTool()
+flights_roundtrip_tool = SearchFlightsRoundtripTool()
 
 # =====================================================
 # 2) HELPER FUNCTIONS (NOT PASSED AS Agent.tools)
@@ -192,7 +233,7 @@ def demo_hotel_options(destination: str, budget_level: str = "mid") -> str:
 # 3) GROUPS EXPOSED TO AGENTS
 # =====================================================
 
-# Only SerperDevTool is passed as a true CrewAI tool; helpers are used inside task descriptions.
+# CrewAI tools and custom functions
 RESEARCH_TOOLS = [web_search]
 SAFETY_TOOLS = [web_search]
-BOOKING_TOOLS = [web_search]
+BOOKING_TOOLS = [web_search, flights_oneway_tool, flights_roundtrip_tool]

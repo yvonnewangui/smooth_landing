@@ -16,21 +16,13 @@ def build_profile_task(traveller_type: str, raw_preferences: str):
     raw_preferences: free text from user, e.g. 'hate hostels, love food tours, mid-range budget'
     """
     description = (
-        "Create a concise traveller profile summary based only on the details below.\n\n"
-        f"Traveller type: {traveller_type}\n"
-        f"New preferences: {raw_preferences}\n\n"
-        "Write 3–6 bullet points covering likely stable preferences:\n"
-        "- Budget level\n"
-        "- Accommodation style\n"
-        "- Preferred activities\n"
-        "- Pace (relaxed / full)\n"
-        "- Safety sensitivities (e.g. dislikes late nights, crowded bars)\n\n"
-        "OUTPUT FORMAT:\n"
-        "### TRAVELLER PROFILE SUMMARY\n"
-        "- [Preference 1]\n"
-        "- [Preference 2]\n"
-        "- [Preference 3]\n"
-        "(Keep it short and general, not tied to one specific day.)\n"
+        f"Traveller: {traveller_type}. Preferences: {raw_preferences}\n\n"
+        "Create 4–5 bullet profile covering:\n"
+        "- Budget/style\n"
+        "- Accommodation preference\n"
+        "- Activity interests\n"
+        "- Pace (relaxed/full)\n"
+        "- Safety sensitivies"
     )
 
     return Task(
@@ -48,183 +40,129 @@ def build_core_tasks(
     traveller_type: str,
     raw_preferences: str,
     start_date,
+    will_fly: bool = False,
 ):
     # 1) Profile
     profile_task = build_profile_task(traveller_type, raw_preferences)
 
     # 2) Research (uses profile)
+    fly_note = "Note: traveller will fly in/out." if will_fly else ""
     research_task = Task(
         description=(
-            "Using the traveller profile and trip details, research the destination.\n\n"
-            f"Trip: {days}-day visit to {destination} with total budget about ${budget}.\n"
-            f"Key interests: {interests}.\n"
-            "Respect stable preferences from the traveller profile (budget, pace, accommodation type,\n"
-            "safety sensitivities, solo-travel concerns).\n\n"
-            "Use the web_search tool whenever you need up-to-date information such as weather,\n"
-            "current safety notes, or recent local changes. Call tools first, then write your answer\n"
-            "based on the tool results.\n\n"
-            "OUTPUT: A brief research outline (bullet points) including:\n"
-            "- Key neighbourhoods to stay / visit\n"
-            "- Rough daily cost level (budget / mid / high)\n"
-            "- Major safety points and areas to be cautious about\n"
-            "- Main local transport options\n"
-            "- Important seasonal/weather notes\n"
+            f"Research {destination} ({days}d, ${budget}, {interests}). {fly_note}\n\n"
+            "Cover:\n"
+            "1. Safety: current hazards, unsafe neighborhoods/times\n"
+            "2. Neighborhoods: safe/convenient areas\n"
+            "3. Daily costs: food, activities, local transport\n"
+            "4. Transport: taxis, apps, night safety\n"
+            "5. Weather & season"
         ),
         agent=destination_researcher,
         context=[profile_task],
-        expected_output="Short research brief covering areas, costs, safety, transport, season."
+        expected_output="Bullet brief: safety, areas, costs, transport, seasonal notes."
     )
 
     # 3) Accommodation
+    budget_for_stay = budget * 0.35  # ~35% for accommodation, leaving 65% for food/activities/transport
     accommodation_task = Task(
         description=(
-            f"Propose 3–5 accommodation options in {destination} using the traveller profile and research brief.\n\n"
-            "Follow these principles:\n"
-            "- Match the traveller's budget level and accommodation style preferences.\n"
-            "- Prefer safe, convenient areas (easy to reach, okay to walk early evening).\n"
-            f"- As a rough guide, keep total accommodation within ~40–50% of the budget (${budget}).\n"
-            "- Call out if a place is especially good for solo travellers (e.g. 24/7 reception, strong reviews).\n\n"
-            "If you need current hotel area information, you may briefly use the web_search tool.\n"
-            "Call the tool first, then update your list based on what you found.\n\n"
-            "OUTPUT:\n"
-            "- 3–5 bullets, each with: name/area, approx nightly price, why it fits this traveller.\n"
+            f"Propose 3–5 options in {destination} (~${budget_for_stay/days:.0f}/night, {days} nights).\n\n"
+            "Priorities:\n"
+            "- Safe, walkable evening areas\n"
+            "- Match traveller style (budget/mid/upscale)\n"
+            "- Good transport links\n"
+            "- Flag 24/7 reception, female-friendly reviews if relevant"
         ),
         agent=accommodation_planner,
         context=[research_task],
-        expected_output="3–5 accommodation options with area, price band, and fit."
+        expected_output="3–5: area, nightly rate, why it fits."
     )
 
     # 4) Activities (day-by-day)
     activities_task = Task(
         description=(
-            f"Create a realistic {days}-day activity plan in {destination} that matches the research brief,\n"
-            f"traveller profile and interests: {interests}.\n\n"
-            "Rules (keep them lightweight but applied):\n"
-            "- Each day has Morning / Afternoon / Evening blocks.\n"
-            "- Max 2–3 major activities per day; balance with lighter stops (parks, cafes, viewpoints).\n"
-            "- Cluster each day around 1–2 nearby areas to reduce long cross-city trips.\n"
-            "- Consider season/weather: avoid planning long exposed outdoor blocks on likely extreme days.\n"
-            "- Make it solo-friendly: include at least a couple of social/group options over the whole stay.\n\n"
-            "Use the web_search tool only when needed for up-to-date opening info or weather-sensitive choices.\n"
-            "Call tools first, then adjust your plan based on the results.\n\n"
-            "OUTPUT (for each day):\n"
-            "Day X:\n"
-            "- Morning: [activities + area]\n"
-            "- Afternoon: [activities + area]\n"
-            "- Evening: [activities + area]\n"
-            "- Notes: [energy level, flexibility, any brief safety/comfort remark]\n"
+            f"Create {days}-day plan for {destination} around {interests}.\n\n"
+            "Rules:\n"
+            "- Max 2–3 major activities/day\n"
+            "- Cluster nearby areas (reduce transit)\n"
+            "- Balance active + light days\n"
+            "- Include social options for solo travellers"
         ),
         agent=activities_planner,
         context=[research_task],
-        expected_output="Day-by-day outline with short notes on pace and practicality."
+        expected_output="Day-by-day: morning/afternoon/evening + energy/safety notes per day."
     )
 
     # 5) Transport
+    transport_note = "Cover airport arrival/departure + " if will_fly else ""
     transport_task = Task(
         description=(
-            "Design a simple, safe transport plan for the whole trip.\n\n"
-            f"Cover this {days}-day stay in {destination} with budget about ${budget}.\n"
-            "Focus on:\n"
-            "- Airport/station ↔ accommodation transfers.\n"
-            "- Getting between the main areas used in the activity plan.\n"
-            "- Any day trips or evening returns that might feel risky.\n\n"
-            "Guidelines:\n"
-            "- Prefer clear, easy-to-follow routes over complex chains of buses/transfers.\n"
-            "- Avoid recommending long unfamiliar walks or multiple changes after ~22:00; suggest taxis/ride-hailing instead.\n"
-            "- Give rough cost ranges for the main segments and a trip-level transport estimate.\n\n"
-            "When you need current options or typical fares (e.g. airport → city), use the web_search tool with\n"
-            "a short query, then incorporate the results into your plan.\n\n"
-            "OUTPUT:\n"
-            "- Airport/station → accommodation: modes + approx cost + brief note.\n"
-            "- Typical daily movement patterns: main modes and when to use them.\n"
-            "- Any specific cautions and safer alternatives.\n"
+            f"Design transport plan for {days} days in {destination}. {transport_note}\n\n"
+            "Cover:\n"
+            "- Accommodation transfers\n"
+            "- Area-to-area connections\n"
+            "- Evening/late-night options (no long walks after 22:00; use apps/taxis)\n\n"
+            "Output: modes, costs, safety notes, late-night alternatives."
         ),
         agent=transport_planner,
         context=[research_task],
-        expected_output="Simple whole-trip transport plan with rough costs and cautions."
+        expected_output="Transport modes, costs, safety guidance, late-night alternatives."
     )
 
     # 6) Coordination (whole-trip shaping)
     coordination_task = Task(
         description=(
-            "Combine research, accommodation, activities and transport into one coherent itinerary.\n\n"
-            "You may reshuffle days or swap blocks if it clearly improves:\n"
-            "- Location clustering (less back-and-forth across the city).\n"
-            "- Safety (busy areas in evenings, simpler late-night moves).\n"
-            "- Pace (no obviously overloaded days).\n\n"
-            "Check for:\n"
-            "- Very long days (over ~10–12 hours of activities + transit).\n"
-            "- Awkward late-night returns after 22:00.\n"
-            "- Obvious clashes between profile preferences and the plan.\n\n"
-            "OUTPUT: One consolidated day-by-day itinerary with stays, activities and key movements.\n"
+            "Synthesize all inputs into a complete day-by-day itinerary.\n\n"
+            "Guidelines:\n"
+            "- Cluster activities by location (minimize back-and-forth)\n"
+            "- Prioritize safety (safe areas for evenings, simple night logistics)\n"
+            "- Maintain realistic pace (no >12hr days, no 22:00+ returns)\n"
+            "- Align with budget and preferences\n\n"
+            "Output as a formatted day-by-day plan. If needed, reorganize activities for better flow. "
+            "Include accommodations, activities, transport, and timing for each day."
         ),
         agent=itinerary_coordinator,
         context=[research_task, accommodation_task, activities_task, transport_task],
-        expected_output="Consolidated itinerary for the whole stay with days, areas, and key moves."
+        expected_output="Formatted day-by-day itinerary with: Day 1-N, stay location, activities, transport, times, safety notes."
     )
 
     # 7) Verification (scores + light edits)
     verification_task = Task(
         description=(
-            f"Review the consolidated {days}-day itinerary for {destination} against budget, feasibility and safety,\n"
-            f"especially for a {traveller_type} traveller with the given preferences.\n\n"
+            f"Verify {days}-day itinerary for {traveller_type}.\n\n"
             "Checklist:\n"
-            "- Timeline: days feel realistic (not clearly overstuffed).\n"
-            "- Transit: no excessive backtracking or complex late-night journeys.\n"
-            "- Safety: nothing obviously worrying for a solo traveller at night.\n"
-            "- Budget: rough split across accommodation, food, activities, transport stays near the target.\n\n"
-            "If you spot clear problems, adjust the itinerary briefly before scoring.\n\n"
-            "OUTPUT STRUCTURE:\n"
+            "- Realistic pacing, not exhausting?\n"
+            "- Safe areas, no risky late-night patterns?\n"
+            "- Budget-aligned?\n\n"
+            "Output:\n"
             "### VERIFIED ITINERARY\n"
-            "[Improved final itinerary text]\n\n"
-            "### SCORES\n"
-            "- Feasibility (0–10): X\n"
-            "- Safety (0–10): Y\n"
-            "- Budget fit (0–10): Z\n"
-            "- Overall confidence (0–100): C\n\n"
-            "### NOTES\n"
-            "[2–5 bullets: key risks, compromises, or suggestions.]\n"
+            "[Adjusted itinerary]\n\n"
+            "### SCORES: Feasibility | Safety | Budget | Confidence (0–10, 0–10, 0–10, 0–100)\n\n"
+            "### RISKS: [Key concerns]"
         ),
         agent=trip_verifier,
         context=[coordination_task],
-        expected_output="Verified itinerary with short scores and notes."
+        expected_output="Adjusted itinerary + feasibility/safety/budget/confidence scores + risk notes."
     )
 
     # 8) Local insights & final client format
     local_insights_task = Task(
         description=(
-            "Turn the verified itinerary into a clear, client-ready document with local tips.\n\n"
-            f"Trip dates: starting {start_date} for {days} days.\n"
-            "Follow this structure:\n"
-            "## TRIP SUMMARY\n"
-            f"- Destination: {destination}\n"
-            f"- Duration: {days} days\n"
-            f"- Approx. budget: ${budget}\n"
-            f"- Traveller type: {traveller_type}\n"
-            "- Style: [brief label you infer, e.g. balanced / foodie / culture-heavy]\n\n"
-            "## SAFETY OVERVIEW\n"
-            "[2–4 sentences on general safety and solo-travel awareness: safer areas, typical scams,\n"
-            "simple night-time advice.]\n\n"
+            f"Format verified itinerary for {destination} ({days}d, ${budget}) as client-ready plan.\n\n"
+            "## TRIP SNAPSHOT\n"
+            "Destination | Days | Budget | Style\n\n"
+            "## SAFETY & HABITS\n"
+            "[Safety overview + 4–6 practical tips]\n\n"
             "## DAILY ITINERARY\n"
-            "For each day:\n"
-            "- Day X – [Short label]\n"
-            "  - Morning: [activities + area]\n"
-            "  - Afternoon: [activities + area]\n"
-            "  - Evening: [activities + area]\n"
-            "  - Notes: [1–2 lines on walking time, safety, or flexibility]\n\n"
-            "## BUDGET SNAPSHOT (ROUGH)\n"
-            "- Accommodation (total): ~$A\n"
-            "- Food (total): ~$B\n"
-            "- Activities (total): ~$C\n"
-            "- Transport (total): ~$D\n"
-            f"- Estimated total: ~$T vs target ${budget}\n"
-            "- Comment: [Under / near / over target with one line of context]\n\n"
-            "## SOLO-SMART TIPS (USEFUL FOR EVERYONE)\n"
-            "[4–8 bullets: practical habits and small behaviours that improve comfort and safety.]\n"
+            "Day X – [Label]: morning/afternoon/evening activities\n\n"
+            "## BUDGET\n"
+            "Accommodation | Food | Activities | Transport | Total\n\n"
+            "## LOCAL TIPS\n"
+            "[Transport hacks, best times, quiet spots, apps]"
         ),
         agent=local_insider,
         context=[verification_task],
-        expected_output="Polished client-ready itinerary following the structure above."
+        expected_output="Polished client-ready itinerary with snapshot, safety, daily plan, budget, tips."
     )
 
     return [
