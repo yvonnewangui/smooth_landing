@@ -1,4 +1,5 @@
 import datetime
+import time
 import streamlit as st
 from crewai import Crew
 from dotenv import load_dotenv
@@ -6,7 +7,7 @@ from dotenv import load_dotenv
 from tasks.core_tasks import build_core_tasks
 from tasks.niche_tasks import build_niche_tasks
 from tasks.tune_up_tasks import build_tune_up_tasks
-from services.flights import search_flights_oneway, search_flights_roundtrip, format_flight_options
+from services.flights import search_flights_oneway, search_flights_roundtrip, format_flight_options, pick_best_flights
 
 from agents.core_agents import (
     destination_researcher,
@@ -36,56 +37,261 @@ load_dotenv()
 # AIRPORT SEARCH HELPER
 # =====================================================
 COMMON_AIRPORTS = {
+    # ── Africa ──
     "NBO": "Nairobi, Kenya",
+    "MBA": "Mombasa, Kenya",
+    "KIS": "Kisumu, Kenya",
     "JNB": "Johannesburg, South Africa",
     "CPT": "Cape Town, South Africa",
+    "DUR": "Durban, South Africa",
+    "ADD": "Addis Ababa, Ethiopia",
+    "DAR": "Dar es Salaam, Tanzania",
+    "JRO": "Kilimanjaro, Tanzania",
+    "ZNZ": "Zanzibar, Tanzania",
+    "EBB": "Entebbe, Uganda",
+    "KGL": "Kigali, Rwanda",
+    "LOS": "Lagos, Nigeria",
+    "ABV": "Abuja, Nigeria",
+    "ACC": "Accra, Ghana",
+    "CMN": "Casablanca, Morocco",
+    "RAK": "Marrakech, Morocco",
+    "TUN": "Tunis, Tunisia",
+    "ALG": "Algiers, Algeria",
+    "CAI": "Cairo, Egypt",
+    "HRG": "Hurghada, Egypt",
+    "SSH": "Sharm El Sheikh, Egypt",
+    "LUN": "Lusaka, Zambia",
+    "LVI": "Livingstone, Zambia",
+    "HRE": "Harare, Zimbabwe",
+    "VFA": "Victoria Falls, Zimbabwe",
+    "MRU": "Mauritius",
+    "SEZ": "Mahé, Seychelles",
+    "TNR": "Antananarivo, Madagascar",
+    "WDH": "Windhoek, Namibia",
+    "GBE": "Gaborone, Botswana",
+    "MQP": "Kruger Mpumalanga, South Africa",
+    "DSS": "Dakar, Senegal",
+    "ABJ": "Abidjan, Ivory Coast",
+    "MPM": "Maputo, Mozambique",
+    "BZV": "Brazzaville, Congo",
+    "FIH": "Kinshasa, DR Congo",
+    "LLW": "Lilongwe, Malawi",
+
+    # ── Middle East ──
     "DXB": "Dubai, UAE",
-    "AMS": "Amsterdam, Netherlands",
+    "AUH": "Abu Dhabi, UAE",
+    "DOH": "Doha, Qatar",
+    "RUH": "Riyadh, Saudi Arabia",
+    "JED": "Jeddah, Saudi Arabia",
+    "MCT": "Muscat, Oman",
+    "BAH": "Bahrain",
+    "KWI": "Kuwait City, Kuwait",
+    "AMM": "Amman, Jordan",
+    "TLV": "Tel Aviv, Israel",
+    "IST": "Istanbul, Turkey",
+    "AYT": "Antalya, Turkey",
+    "SAW": "Istanbul Sabiha, Turkey",
+    "ESB": "Ankara, Turkey",
+
+    # ── Europe ──
     "LHR": "London Heathrow, UK",
-    "CDG": "Paris, France",
-    "FCO": "Rome, Italy",
+    "LGW": "London Gatwick, UK",
+    "STN": "London Stansted, UK",
+    "LTN": "London Luton, UK",
+    "MAN": "Manchester, UK",
+    "EDI": "Edinburgh, UK",
+    "BHX": "Birmingham, UK",
+    "CDG": "Paris CDG, France",
+    "ORY": "Paris Orly, France",
+    "NCE": "Nice, France",
+    "LYS": "Lyon, France",
+    "MRS": "Marseille, France",
+    "AMS": "Amsterdam, Netherlands",
+    "FRA": "Frankfurt, Germany",
+    "MUC": "Munich, Germany",
+    "BER": "Berlin, Germany",
+    "HAM": "Hamburg, Germany",
+    "DUS": "Düsseldorf, Germany",
+    "FCO": "Rome Fiumicino, Italy",
+    "MXP": "Milan Malpensa, Italy",
+    "VCE": "Venice, Italy",
+    "NAP": "Naples, Italy",
+    "FLR": "Florence, Italy",
     "MAD": "Madrid, Spain",
     "BCN": "Barcelona, Spain",
-    "ORY": "Paris Orly, France",
-    "MUC": "Munich, Germany",
+    "AGP": "Malaga, Spain",
+    "PMI": "Palma de Mallorca, Spain",
+    "SVQ": "Seville, Spain",
+    "LIS": "Lisbon, Portugal",
+    "OPO": "Porto, Portugal",
+    "FAO": "Faro, Portugal",
     "ZRH": "Zurich, Switzerland",
+    "GVA": "Geneva, Switzerland",
     "VIE": "Vienna, Austria",
     "PRG": "Prague, Czech Republic",
-    "LAX": "Los Angeles, USA",
+    "BUD": "Budapest, Hungary",
+    "WAW": "Warsaw, Poland",
+    "KRK": "Krakow, Poland",
+    "CPH": "Copenhagen, Denmark",
+    "OSL": "Oslo, Norway",
+    "ARN": "Stockholm, Sweden",
+    "HEL": "Helsinki, Finland",
+    "DUB": "Dublin, Ireland",
+    "BRU": "Brussels, Belgium",
+    "ATH": "Athens, Greece",
+    "SKG": "Thessaloniki, Greece",
+    "JTR": "Santorini, Greece",
+    "JMK": "Mykonos, Greece",
+    "OTP": "Bucharest, Romania",
+    "SOF": "Sofia, Bulgaria",
+    "ZAG": "Zagreb, Croatia",
+    "DBV": "Dubrovnik, Croatia",
+    "SPU": "Split, Croatia",
+    "LJU": "Ljubljana, Slovenia",
+    "BEG": "Belgrade, Serbia",
+    "TIA": "Tirana, Albania",
+    "KEF": "Reykjavik, Iceland",
+    "RIX": "Riga, Latvia",
+    "VNO": "Vilnius, Lithuania",
+    "TLL": "Tallinn, Estonia",
+
+    # ── North America ──
     "JFK": "New York JFK, USA",
     "EWR": "Newark, USA",
-    "ORD": "Chicago, USA",
-    "MIA": "Miami, USA",
+    "LGA": "New York LaGuardia, USA",
+    "LAX": "Los Angeles, USA",
     "SFO": "San Francisco, USA",
+    "ORD": "Chicago O'Hare, USA",
+    "MIA": "Miami, USA",
+    "ATL": "Atlanta, USA",
+    "DFW": "Dallas, USA",
+    "DEN": "Denver, USA",
     "SEA": "Seattle, USA",
-    "TOR": "Toronto, Canada",
+    "BOS": "Boston, USA",
+    "IAD": "Washington Dulles, USA",
+    "IAH": "Houston, USA",
+    "MSP": "Minneapolis, USA",
+    "DTW": "Detroit, USA",
+    "PHX": "Phoenix, USA",
+    "LAS": "Las Vegas, USA",
+    "MCO": "Orlando, USA",
+    "HNL": "Honolulu, USA",
+    "SAN": "San Diego, USA",
+    "PHL": "Philadelphia, USA",
+    "YYZ": "Toronto, Canada",
     "YVR": "Vancouver, Canada",
-    "SYD": "Sydney, Australia",
-    "MEL": "Melbourne, Australia",
-    "BKK": "Bangkok, Thailand",
-    "SIN": "Singapore",
-    "HKG": "Hong Kong",
-    "NRT": "Tokyo Narita, Japan",
-    "ICN": "Seoul Incheon, South Korea",
-    "BLR": "Bangalore, India",
+    "YUL": "Montreal, Canada",
+    "YOW": "Ottawa, Canada",
+    "YYC": "Calgary, Canada",
+    "MEX": "Mexico City, Mexico",
+    "CUN": "Cancún, Mexico",
+    "GDL": "Guadalajara, Mexico",
+    "SJD": "Los Cabos, Mexico",
+
+    # ── Central America & Caribbean ──
+    "PTY": "Panama City, Panama",
+    "SJO": "San José, Costa Rica",
+    "GUA": "Guatemala City, Guatemala",
+    "HAV": "Havana, Cuba",
+    "MBJ": "Montego Bay, Jamaica",
+    "KIN": "Kingston, Jamaica",
+    "NAS": "Nassau, Bahamas",
+    "PUJ": "Punta Cana, Dominican Republic",
+    "SDQ": "Santo Domingo, Dominican Republic",
+    "SXM": "St Maarten",
+    "AUA": "Aruba",
+    "BGI": "Barbados",
+    "POS": "Port of Spain, Trinidad",
+
+    # ── South America ──
+    "GRU": "São Paulo, Brazil",
+    "GIG": "Rio de Janeiro, Brazil",
+    "EZE": "Buenos Aires, Argentina",
+    "SCL": "Santiago, Chile",
+    "BOG": "Bogotá, Colombia",
+    "CTG": "Cartagena, Colombia",
+    "MDE": "Medellín, Colombia",
+    "LIM": "Lima, Peru",
+    "CUZ": "Cusco, Peru",
+    "UIO": "Quito, Ecuador",
+    "MVD": "Montevideo, Uruguay",
+    "CCS": "Caracas, Venezuela",
+    "LPB": "La Paz, Bolivia",
+    "ASU": "Asunción, Paraguay",
+
+    # ── South Asia ──
     "DEL": "New Delhi, India",
     "BOM": "Mumbai, India",
-    "MLE": "Malé, Maldives",
+    "BLR": "Bangalore, India",
+    "MAA": "Chennai, India",
+    "CCU": "Kolkata, India",
+    "HYD": "Hyderabad, India",
+    "GOI": "Goa, India",
+    "COK": "Kochi, India",
     "CMB": "Colombo, Sri Lanka",
+    "DAC": "Dhaka, Bangladesh",
+    "KTM": "Kathmandu, Nepal",
+    "ISB": "Islamabad, Pakistan",
+    "KHI": "Karachi, Pakistan",
+    "LHE": "Lahore, Pakistan",
+    "MLE": "Malé, Maldives",
+
+    # ── East & Southeast Asia ──
+    "BKK": "Bangkok, Thailand",
+    "CNX": "Chiang Mai, Thailand",
+    "HKT": "Phuket, Thailand",
+    "USM": "Koh Samui, Thailand",
+    "SIN": "Singapore",
     "KUL": "Kuala Lumpur, Malaysia",
+    "PEN": "Penang, Malaysia",
+    "BKI": "Kota Kinabalu, Malaysia",
+    "LGK": "Langkawi, Malaysia",
+    "CGK": "Jakarta, Indonesia",
+    "DPS": "Bali, Indonesia",
+    "MNL": "Manila, Philippines",
+    "CEB": "Cebu, Philippines",
+    "HAN": "Hanoi, Vietnam",
+    "SGN": "Ho Chi Minh City, Vietnam",
+    "DAD": "Da Nang, Vietnam",
+    "PNH": "Phnom Penh, Cambodia",
+    "REP": "Siem Reap, Cambodia",
+    "VTE": "Vientiane, Laos",
+    "LPQ": "Luang Prabang, Laos",
+    "RGN": "Yangon, Myanmar",
+    "HKG": "Hong Kong",
+    "TPE": "Taipei, Taiwan",
+
+    # ── East Asia ──
+    "NRT": "Tokyo Narita, Japan",
+    "HND": "Tokyo Haneda, Japan",
+    "KIX": "Osaka, Japan",
+    "CTS": "Sapporo, Japan",
+    "FUK": "Fukuoka, Japan",
+    "OKA": "Okinawa, Japan",
+    "ICN": "Seoul Incheon, South Korea",
+    "GMP": "Seoul Gimpo, South Korea",
+    "PUS": "Busan, South Korea",
     "PEK": "Beijing, China",
     "PVG": "Shanghai, China",
     "CAN": "Guangzhou, China",
-    "PKG": "Bangkok, Thailand",
-    "MNL": "Manila, Philippines",
-    "HAN": "Hanoi, Vietnam",
-    "SGN": "Ho Chi Minh City, Vietnam",
-    "CTS": "Sapporo, Japan",
-    "KIX": "Osaka, Japan",
-    "BKI": "Kota Kinabalu, Malaysia",
-    "PHC": "Phnom Penh, Cambodia",
-    "VTE": "Vientiane, Laos",
-    "RGN": "Yangon, Myanmar",
+    "SZX": "Shenzhen, China",
+    "CTU": "Chengdu, China",
+    "ULN": "Ulaanbaatar, Mongolia",
+
+    # ── Oceania ──
+    "SYD": "Sydney, Australia",
+    "MEL": "Melbourne, Australia",
+    "BNE": "Brisbane, Australia",
+    "PER": "Perth, Australia",
+    "ADL": "Adelaide, Australia",
+    "CNS": "Cairns, Australia",
+    "AKL": "Auckland, New Zealand",
+    "CHC": "Christchurch, New Zealand",
+    "ZQN": "Queenstown, New Zealand",
+    "NAN": "Nadi, Fiji",
+    "PPT": "Papeete, Tahiti",
+    "APW": "Apia, Samoa",
+    "NOU": "Nouméa, New Caledonia",
 }
 
 # String constants to avoid duplication
@@ -95,6 +301,11 @@ OPENING_ITINERARY_CARD = '<div class="itinerary-card">'
 ITINERARY_VIEW_LABEL = "Smooth Landing view (formatted)"
 EDIT_TEXT_LABEL = "#### Edit text (optional)"
 PARIS_FRANCE = "Paris, France"
+
+
+def _escape_dollars(text: str) -> str:
+    """Escape $ signs so Streamlit markdown doesn't render them as LaTeX."""
+    return text.replace("$", "\\$") if text else text
 
 
 def search_airports(search_term: str):
@@ -144,6 +355,8 @@ def _run_niche_overlays(destination, budget, days, interests, profile_flags, sta
             passport_country,
             trip_purpose,
             home_airport,
+            core_itinerary,
+            airports=COMMON_AIRPORTS,
         )
 
         niche_agents = []
@@ -175,6 +388,11 @@ def _run_niche_overlays(destination, budget, days, interests, profile_flags, sta
             st.error("Please switch on at least one Smooth Landing profile above.")
         else:
             status.write("Calling in the specialists…")
+            status.write("⏳ Spacing out requests to respect API rate limits (one specialist per second)…")
+            
+            # Add delay to prevent rate limiting on Groq API
+            time.sleep(1)
+            
             crew = Crew(
                 agents=niche_agents,
                 tasks=niche_tasks,
@@ -510,7 +728,7 @@ with tab1:
     # Core itinerary display + editable notebook
     if st.session_state.core_itinerary.strip():
         with st.expander(ITINERARY_VIEW_LABEL, expanded=True):
-            st.markdown(st.session_state.core_itinerary, unsafe_allow_html=False)
+            st.markdown(_escape_dollars(st.session_state.core_itinerary), unsafe_allow_html=False)
     else:
         st.info("Generate a core itinerary to see your Smooth Landing view here.")
 
@@ -549,7 +767,7 @@ with tab1:
     if st.session_state.niche_itinerary.strip():
         st.markdown("#### Smooth Landing overlay suggestions")
         with st.expander("View overlays (formatted)", expanded=True):
-            st.markdown(st.session_state.niche_itinerary, unsafe_allow_html=False)
+            st.markdown(_escape_dollars(st.session_state.niche_itinerary), unsafe_allow_html=False)
         st.caption("Copy any parts you like into your core itinerary above, then regenerate or tune.")
 
 
@@ -680,7 +898,7 @@ with tab2:
 
             # Formatted view
             with st.expander(ITINERARY_VIEW_LABEL, expanded=True):
-                st.markdown(st.session_state.tune_result, unsafe_allow_html=False)
+                st.markdown(_escape_dollars(st.session_state.tune_result), unsafe_allow_html=False)
 
             st.markdown(EDIT_TEXT_LABEL)
             st.markdown(OPENING_ITINERARY_CARD, unsafe_allow_html=True)
@@ -697,7 +915,7 @@ with tab2:
     elif st.session_state.tune_result.strip():
         st.markdown("#### Previous tune‑up results")
         with st.expander(ITINERARY_VIEW_LABEL, expanded=True):
-            st.markdown(st.session_state.tune_result, unsafe_allow_html=False)
+            st.markdown(_escape_dollars(st.session_state.tune_result), unsafe_allow_html=False)
 
         st.markdown(EDIT_TEXT_LABEL)
         st.markdown(OPENING_ITINERARY_CARD, unsafe_allow_html=True)
@@ -815,26 +1033,29 @@ with tab3:
                         st.warning("No outbound flights found. Try different dates or airports.")
                     else:
                         st.markdown("### ✈️ Outbound flights")
-                        for i, opt in enumerate(outbound_options, start=1):
-                            col1, col2, col3 = st.columns([2, 2, 1])
-                            with col1:
-                                st.markdown(f"**{opt.get('airline', 'Airline')}**")
-                            with col2:
-                                st.markdown(f"{opt.get('departure', 'N/A')} → {opt.get('arrival', 'N/A')}")
-                            with col3:
-                                st.markdown(f"**{opt.get('currency', '')} {opt.get('price', 'N/A')}**")
-                            st.caption(f"{opt.get('duration_minutes', 'N/A')} min • {opt.get('stops', 0)} stop(s)")
-                            if opt.get("deeplink"):
-                                st.link_button("Book on Skyscanner", opt["deeplink"], key=f"out_{i}")
-                            st.divider()
 
-                    # Display return flights if round-trip
-                    if trip_type == "Return":
-                        if not inbound_options or (isinstance(inbound_options, dict) and "error" in inbound_options):
-                            st.info("No return flights found for the chosen date. You can still book a one‑way outbound.")
-                        else:
-                            st.markdown("### ✈️ Return flights")
-                            for i, opt in enumerate(inbound_options, start=1):
+                        # Show top picks
+                        picks = pick_best_flights(outbound_options)
+                        pick_cols = st.columns(3)
+                        for col, key in zip(pick_cols, ["best", "cheapest", "shortest"]):
+                            p = picks[key]
+                            if p:
+                                with col:
+                                    stops_label = "Non-stop" if p.get("stops", 0) == 0 else f"{p['stops']} stop(s)"
+                                    st.metric(
+                                        label=p["tag"],
+                                        value=f"${p.get('price', 'N/A')}",
+                                        delta=f"{p.get('duration_minutes', '?')} min · {stops_label}",
+                                        delta_color="off",
+                                    )
+                                    st.caption(f"{p.get('airline', '')} · {p.get('departure', '')} → {p.get('arrival', '')}")
+                                    if p.get("deeplink"):
+                                        st.link_button("Book", p["deeplink"], key=f"pick_out_{key}")
+                        st.divider()
+
+                        # Full list
+                        with st.expander("All outbound options", expanded=False):
+                            for i, opt in enumerate(outbound_options, start=1):
                                 col1, col2, col3 = st.columns([2, 2, 1])
                                 with col1:
                                     st.markdown(f"**{opt.get('airline', 'Airline')}**")
@@ -844,5 +1065,46 @@ with tab3:
                                     st.markdown(f"**{opt.get('currency', '')} {opt.get('price', 'N/A')}**")
                                 st.caption(f"{opt.get('duration_minutes', 'N/A')} min • {opt.get('stops', 0)} stop(s)")
                                 if opt.get("deeplink"):
-                                    st.link_button("Book on Skyscanner", opt["deeplink"], key=f"ret_{i}")
+                                    st.link_button("Book on Skyscanner", opt["deeplink"], key=f"out_{i}")
                                 st.divider()
+
+                    # Display return flights if round-trip
+                    if trip_type == "Return":
+                        if not inbound_options or (isinstance(inbound_options, dict) and "error" in inbound_options):
+                            st.info("No return flights found for the chosen date. You can still book a one‑way outbound.")
+                        else:
+                            st.markdown("### ✈️ Return flights")
+
+                            # Show top picks
+                            ret_picks = pick_best_flights(inbound_options)
+                            ret_cols = st.columns(3)
+                            for col, key in zip(ret_cols, ["best", "cheapest", "shortest"]):
+                                p = ret_picks[key]
+                                if p:
+                                    with col:
+                                        stops_label = "Non-stop" if p.get("stops", 0) == 0 else f"{p['stops']} stop(s)"
+                                        st.metric(
+                                            label=p["tag"],
+                                            value=f"${p.get('price', 'N/A')}",
+                                            delta=f"{p.get('duration_minutes', '?')} min · {stops_label}",
+                                            delta_color="off",
+                                        )
+                                        st.caption(f"{p.get('airline', '')} · {p.get('departure', '')} → {p.get('arrival', '')}")
+                                        if p.get("deeplink"):
+                                            st.link_button("Book", p["deeplink"], key=f"pick_ret_{key}")
+                            st.divider()
+
+                            # Full list
+                            with st.expander("All return options", expanded=False):
+                                for i, opt in enumerate(inbound_options, start=1):
+                                    col1, col2, col3 = st.columns([2, 2, 1])
+                                    with col1:
+                                        st.markdown(f"**{opt.get('airline', 'Airline')}**")
+                                    with col2:
+                                        st.markdown(f"{opt.get('departure', 'N/A')} → {opt.get('arrival', 'N/A')}")
+                                    with col3:
+                                        st.markdown(f"**{opt.get('currency', '')} {opt.get('price', 'N/A')}**")
+                                    st.caption(f"{opt.get('duration_minutes', 'N/A')} min • {opt.get('stops', 0)} stop(s)")
+                                    if opt.get("deeplink"):
+                                        st.link_button("Book on Skyscanner", opt["deeplink"], key=f"ret_{i}")
+                                    st.divider()

@@ -2,7 +2,7 @@ import os
 import requests
 from datetime import datetime, timedelta
 
-SKYSCANNER_API_HOST = "skyscanner80.p.rapidapi.com"
+SKYSCANNER_API_HOST = os.getenv("SKYSCANNER_API_HOST", "flights-sky.p.rapidapi.com")
 SKYSCANNER_API_KEY = os.getenv("SKYSCANNER_API_KEY")
 
 
@@ -28,6 +28,18 @@ def search_flights_oneway(origin, destination, date, adults=1, currency="USD"):
         date_str = date.strftime("%Y-%m-%d")
     else:
         date_str = str(date)
+
+    # Validate: don't search for past dates — bump to tomorrow
+    try:
+        search_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        today = datetime.now().date()
+        if search_date < today:
+            date_str = (today + timedelta(days=1)).strftime("%Y-%m-%d")
+        elif search_date == today and datetime.now().hour >= 18:
+            # Same day but evening — most flights already departed
+            date_str = (today + timedelta(days=1)).strftime("%Y-%m-%d")
+    except ValueError:
+        pass  # If date parsing fails, let the API handle it
 
     url = f"https://{SKYSCANNER_API_HOST}/api/v1/flights/search-oneway"
     headers = {
@@ -145,3 +157,44 @@ def format_flight_options(flights, direction="outbound"):
             output += f"- [Book here]({flight['deeplink']})\n"
     
     return output
+
+
+def pick_best_flights(flights):
+    """
+    From a list of flight options, pick the best, cheapest, and shortest.
+
+    Returns:
+        dict with keys 'best', 'cheapest', 'shortest' — each a flight dict
+        with an added 'tag' field, or None if no valid flights.
+        Flights may overlap (e.g. cheapest may also be shortest).
+    """
+    if not flights or isinstance(flights, dict):
+        return {"best": None, "cheapest": None, "shortest": None}
+
+    valid = [f for f in flights if _safe_num(f.get("price")) is not None]
+    if not valid:
+        return {"best": None, "cheapest": None, "shortest": None}
+
+    cheapest = min(valid, key=lambda f: _safe_num(f["price"]))
+    shortest = min(valid, key=lambda f: _safe_num(f.get("duration_minutes"), 99999))
+
+    # "Best" = fewest stops first, then shortest duration, then cheapest
+    best = min(valid, key=lambda f: (
+        f.get("stops", 99),
+        _safe_num(f.get("duration_minutes"), 99999),
+        _safe_num(f["price"]),
+    ))
+
+    return {
+        "best": {**best, "tag": "🏆 Best"},
+        "cheapest": {**cheapest, "tag": "💰 Cheapest"},
+        "shortest": {**shortest, "tag": "⚡ Shortest"},
+    }
+
+
+def _safe_num(val, default=None):
+    """Safely convert a value to float, returning default on failure."""
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return default

@@ -30,7 +30,11 @@ web_search = SerperDevTool(
 
 class SearchFlightsOnewayTool(BaseTool):
     name: str = "search_flights_oneway"
-    description: str = "Search one-way flights between two airports on a specific date using Skyscanner API"
+    description: str = (
+        "Search one-way flights on a specific date. "
+        "IMPORTANT: origin and destination MUST be 3-letter IATA airport codes (e.g. NBO, DPS, JFK). "
+        "Do NOT pass city names like 'Bali' or 'Nairobi'. Use the airport code."
+    )
     
     def _run(self, origin: str, destination: str, date: str, adults: int = 1, currency: str = "USD") -> str:
         """Execute the one-way flight search"""
@@ -46,7 +50,11 @@ class SearchFlightsOnewayTool(BaseTool):
 
 class SearchFlightsRoundtripTool(BaseTool):
     name: str = "search_flights_roundtrip"
-    description: str = "Search round-trip flights (outbound and return) between two airports using Skyscanner API"
+    description: str = (
+        "Search round-trip flights (outbound + return). "
+        "IMPORTANT: origin and destination MUST be 3-letter IATA airport codes (e.g. NBO, DPS, JFK). "
+        "Do NOT pass city names like 'Bali' or 'Nairobi'. Use the airport code."
+    )
     
     def _run(self, origin: str, destination: str, outbound_date: str, return_date: str, adults: int = 1, currency: str = "USD") -> str:
         """Execute the round-trip flight search"""

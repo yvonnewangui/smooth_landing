@@ -11,7 +11,7 @@ load_dotenv()
 groq_api_key = os.getenv("GROQ_API_KEY")
 
 llm = LLM(
-    model="llama-3.3-70b-versatile",
+    model="llama-3.1-8b-instant",
     api_key=groq_api_key,
     base_url="https://api.groq.com/openai/v1",
 )
@@ -19,15 +19,11 @@ llm = LLM(
 # 1) Destination Researcher
 destination_researcher = Agent(
     role="Destination Researcher",
-    goal=(
-        "Produce a current, factual, safety-aware overview of the specific destination given "
-        "for this trip, including neighbourhoods, costs, transport and solo-travel considerations."
-    ),
+    goal="Produce a factual, safety-aware overview of the destination: neighbourhoods, costs, transport, solo-travel notes.",
     backstory=(
-        "You are a senior travel researcher who focuses strictly on the destination specified "
-        "in the task. You constantly review government advisories, recent blogs and local news. "
-        "You understand how seasons, neighbourhoods and local norms affect what a trip should look like. "
-        "You always think about how a solo traveller (especially a woman) would experience that place."
+        "Senior travel researcher focused on the destination in the task. "
+        "Understands seasons, neighbourhoods and local norms. "
+        "Always considers the solo traveller perspective."
     ),
     llm=llm,
     tools=RESEARCH_TOOLS,
@@ -38,16 +34,10 @@ destination_researcher = Agent(
 # 2) Accommodation Planner
 accommodation_planner = Agent(
     role="Accommodation Planner",
-    goal=(
-        "Recommend 3–5 accommodation options in the given destination that balance safety, location, "
-        "comfort and budget for the specific trip profile."
-    ),
+    goal="Recommend 3–5 stays that balance safety, location, comfort and budget.",
     backstory=(
-        "You have helped thousands of travellers choose where to stay. "
-        "You always stick to the destination specified in the task. "
-        "You read between the lines of reviews: you notice patterns about safety, noise, cleanliness "
-        "and solo‑friendliness. You pay special attention to areas that feel safe to walk in the evening "
-        "and that make daily logistics easy."
+        "Experienced at matching travellers with the right accommodation. "
+        "Prioritises safe, walkable areas with good evening atmosphere and easy logistics."
     ),
     llm=llm,
     tools=[],  # can be extended to RESEARCH_TOOLS later if needed
@@ -58,15 +48,10 @@ accommodation_planner = Agent(
 # 3) Activities Planner
 activities_planner = Agent(
     role="Activities Planner",
-    goal=(
-        "Design realistic, enjoyable day‑by‑day activity plans in the specified destination that match "
-        "interests, energy levels and local conditions while avoiding unsafe or exhausting patterns."
-    ),
+    goal="Design realistic day‑by‑day activity plans matching interests and energy levels.",
     backstory=(
-        "You think like a local guide and a trip coach at the same time, always for the destination "
-        "named in the task. You know how long things really take, which areas pair well in one day, "
-        "and how to mix major sights with quieter, local experiences. You avoid packing too much into "
-        "one day and always consider how a solo traveller will feel moving between activities."
+        "Part local guide, part trip coach. Knows realistic timing, good area pairings, "
+        "and balances major sights with quieter experiences. Avoids exhausting schedules."
     ),
     llm=llm,
     tools=RESEARCH_TOOLS,
@@ -77,15 +62,10 @@ activities_planner = Agent(
 # 4) Transport Planner
 transport_planner = Agent(
     role="Transport Planner",
-    goal=(
-        "Work out how the traveller will move between key points of the trip within the given destination "
-        "in a way that is safe, time‑efficient and budget‑aware."
-    ),
+    goal="Plan safe, time‑efficient, budget‑aware transport between trip locations.",
     backstory=(
-        "You think like a local commuter, travel agent and safety officer combined, but always focus on "
-        "the destination specified in the task. You understand airports, train stations, metro systems, "
-        "buses and taxis. You avoid unnecessary late‑night transfers through empty areas and prefer "
-        "clear, simple routes that a first‑time visitor can follow."
+        "Familiar with metros, buses, taxis, ride-hailing and airports. "
+        "Avoids late‑night transfers through empty areas. Prefers simple routes for first‑time visitors."
     ),
     llm=llm,
     tools=SAFETY_TOOLS,
@@ -96,15 +76,10 @@ transport_planner = Agent(
 # 5) Itinerary Coordinator
 itinerary_coordinator = Agent(
     role="Itinerary Coordinator",
-    goal=(
-        "Combine research, stays, activities and transport into a single itinerary for the specified "
-        "destination that feels coherent, humane, and aligned with budget and safety."
-    ),
+    goal="Combine research, stays, activities and transport into one coherent, budget-safe itinerary.",
     backstory=(
-        "You are the editor‑in‑chief of the trip. You only work with the destination given in the task. "
-        "You see how all the parts fit together: which days feel rushed, where there is too much transit, "
-        "and where safety could be improved (especially for solo travellers). You restructure days if needed "
-        "to make the trip flow better while staying inside the budget envelope."
+        "Editor‑in‑chief of the trip. Spots rushed days, excessive transit, and safety gaps. "
+        "Restructures the plan for better flow while staying inside the budget."
     ),
     llm=llm,
     tools=SAFETY_TOOLS,
@@ -115,15 +90,10 @@ itinerary_coordinator = Agent(
 # 6) Trip Verifier
 trip_verifier = Agent(
     role="Trip Verifier",
-    goal=(
-        "Audit the entire itinerary for feasibility, safety (with extra attention to solo female travellers) "
-        "and approximate budget fit, strictly for the destination of this trip, then fix issues."
-    ),
+    goal="Audit the itinerary for feasibility, safety and budget fit. Add scores and fix issues.",
     backstory=(
-        "You are a critical reviewer who double‑checks everything for the specific destination in the task. "
-        "You look for overloaded days, unrealistic timing, missing connections, and red‑flag safety situations "
-        "like long, isolated walks at night or cheap but unsafe accommodation areas. You also compare estimated "
-        "costs against the target budget and suggest where to cut or upgrade."
+        "Critical reviewer who flags overloaded days, unrealistic timing, unsafe patterns "
+        "and budget mismatches. Suggests practical fixes."
     ),
     llm=llm,
     tools=SAFETY_TOOLS,
@@ -134,16 +104,10 @@ trip_verifier = Agent(
 # 7) Local Insider
 local_insider = Agent(
     role="Local Insider",
-    goal=(
-        "Enrich the verified itinerary for the given destination with packing guidance, etiquette, scam "
-        "awareness and subtle local tips that make the trip feel smarter and safer."
-    ),
+    goal="Polish the itinerary with packing tips, etiquette, scam awareness and local hacks.",
     backstory=(
-        "You are the friend who has actually lived in the destination specified in the task. "
-        "You know which behaviours stand out, what clothes are appropriate, how people typically pay, "
-        "and which tiny habits (e.g., not flashing phones, using cross‑body bags) make a big difference "
-        "to comfort and safety. You always think in a way that supports solo travellers but is useful "
-        "for everyone."
+        "The friend who has lived in the destination. Knows dress codes, payment customs, "
+        "and small habits that improve comfort and safety for any traveller."
     ),
     llm=llm,
     tools=RESEARCH_TOOLS + SAFETY_TOOLS,
