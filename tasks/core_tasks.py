@@ -22,6 +22,7 @@ def build_core_tasks(
     start_date,
     will_fly: bool = False,
     passport_country: str = None,
+    trip_purpose: str = None,
 ):
     # 1) Research (account for traveller profile: {traveller_type}, preferences: {raw_preferences})
     fly_note = "(Will fly in/out)" if will_fly else ""
@@ -56,21 +57,26 @@ def build_core_tasks(
     # 3) Visa Requirements (CORE)
     visa_task = Task(
         description=(
-            f"Visa requirements for {passport_country or 'traveler'} passport → {destination} ({traveller_type}, {days}d from {start_date}). "
+            f"CRITICAL: Research visa requirements for travel FROM {passport_country} TO {destination}. "
+            f"Traveler: {passport_country} passport holder going to {destination} for {trip_purpose} ({days} days from {start_date}). "
+            f"DO NOT research {passport_country} visa requirements. "
+            f"DO research what a {passport_country} citizen needs to enter {destination} for {trip_purpose}. "
             f"CRITICAL ACCURACY REQUIRED: "
-            f"1) ONLY use official government websites from {destination}'s immigration authority. "
-            f"2) If the official site is unclear or you cannot access it, recommend checking the official embassy/consulate directly. "
-            f"3) DO NOT assume visa-free policies - VERIFY from official sources only. "
-            f"4) Include: visa type (or 'Check official sources' if uncertain), required documents, application steps, fees in USD, processing time. "
-            f"5) For any uncertainty, add a clear warning to verify directly with official source. "
-            f"6) Be conservative: if you cannot confirm a policy, state that verification is needed."
+            f"1) ONLY use official government websites from {destination}'s immigration authority (NOT {passport_country}'s). "
+            f"2) Search for: '{passport_country} citizens {destination} visa {trip_purpose}' or '{destination} visa {passport_country} nationality'. "
+            f"3) If the official site is unclear or you cannot access it, recommend checking the official embassy/consulate directly. "
+            f"4) DO NOT assume visa-free policies - VERIFY from official sources only. "
+            f"5) Include: visa type (or 'Check official sources' if uncertain), required documents, application steps, fees in USD, processing time. "
+            f"6) For any uncertainty, add a clear warning to verify directly with {destination}'s official embassy/consulate. "
+            f"7) Be conservative: if you cannot confirm a policy, state that verification is needed."
         ),
         agent=visa_requirements_advisor,
         context=[research_task],
         expected_output=(
-            f"Visa requirements checklist from official government sources only. "
-            f"Include: visa type, required documents, application process, fees (USD), processing time, official website link. "
-            f"If information is unclear or not verifiable, recommend consulting official embassy/consulate directly."
+            f"Visa requirements for {passport_country} passport holders entering {destination} for {trip_purpose}. "
+            f"From {destination}'s official government sources only. "
+            f"Include: visa type required (or visa-free/on-arrival/e-visa), required documents, application process, fees (USD), processing time, official {destination} immigration website link. "
+            f"If information is unclear or not verifiable, recommend consulting {destination}'s official embassy/consulate directly in {passport_country}."
         )
     )
 
@@ -265,7 +271,7 @@ def build_core_tasks(
         ),
         agent=local_insider,
         context=[verification_task, visa_task, health_task],
-        expected_output=f"Final itinerary structure: \n1. Trip Snapshot (travel dates, weather, budget breakdown)\n2. Visa Requirements (type, documents, process, fees USD, processing time)\n3. Health & Wellness (vaccines, disease risks, water/food safety, healthcare)\n4. Accommodation Options\n5. Daily Itinerary (## Day X heading, metrics line, activity table with Time|Activity|Location|Transport|Cost|Comment) for ALL {days} days\n6. Weather Forecast\n7. Packing List (specific to {destination} weather)\n8. Safety Tips\n9. Cost Breakdown. BLANK LINES between sections. All activity names specific with venue names. Markdown formatted. All costs USD. NO ABBREVIATIONS."
+        expected_output=f"Final itinerary structure: \n1. ##Trip Snapshot (travel dates, weather, budget breakdown)\n2. ##Visa Requirements (type, documents, process, fees USD, processing time)\n3. ##Health & Wellness (vaccines, disease risks, water/food safety, healthcare)\n4. ##Accommodation Options\n5. ##Daily Itinerary (# Day X heading, metrics line, activity table with Time|Activity|Location|Transport|Cost|Comment) for ALL {days} days\n6. Weather Forecast\n7. Packing List (specific to {destination} weather)\n8. Safety Tips\n9. Cost Breakdown. BLANK LINES between sections. All activity names specific with venue names. Markdown formatted. All costs USD. NO ABBREVIATIONS."
     )
 
     return [

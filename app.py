@@ -707,8 +707,9 @@ with tab1:
                     new_traveller_type,
                     new_raw_preferences,
                     new_start_date,
-                    will_fly = will_fly,
-                    passport_country = passport_country,
+                    will_fly=will_fly,
+                    passport_country=passport_country,
+                    trip_purpose=trip_purpose,
                 )
 
                 core_agents = [
