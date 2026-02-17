@@ -298,8 +298,8 @@ COMMON_AIRPORTS = {
 CUSTOM_DESTINATION = "Custom destination"
 CLOSING_DIV = "</div>"
 OPENING_ITINERARY_CARD = '<div class="itinerary-card">'
-ITINERARY_VIEW_LABEL = "Smooth Landing view (formatted)"
-EDIT_TEXT_LABEL = "#### Edit text (optional)"
+ITINERARY_VIEW_LABEL = "Your Itinerary"
+EDIT_TEXT_LABEL = "#### Customize (optional)"
 PARIS_FRANCE = "Paris, France"
 
 
@@ -693,10 +693,10 @@ with tab1:
 
     col_core_header, col_core_button = st.columns([3, 1])
     with col_core_header:
-        st.markdown("### Core itinerary")
-        st.caption("This is your main Smooth Landing plan – clear, realistic, and easy to tweak.")
+        st.markdown("### Your Itinerary")
+        st.caption("Clear, realistic, and yours to edit.")
     with col_core_button:
-        if st.button("Generate / regenerate core", key="btn_core", use_container_width=True):
+        if st.button("Create Your Itinerary", key="btn_core", use_container_width=True):
             with st.status("Crafting your Smooth Landing route…", expanded=False) as status:
                 status.write("Understanding your destination, dates, and style…")
                 core_tasks = build_core_tasks(
@@ -747,7 +747,7 @@ with tab1:
         with st.expander(ITINERARY_VIEW_LABEL, expanded=True):
             st.markdown(_escape_dollars(st.session_state.core_itinerary), unsafe_allow_html=False)
     else:
-        st.info("Generate a core itinerary to see your Smooth Landing view here.")
+        st.info("👆 Click 'Create Your Itinerary' above to generate your personalized itinerary.")
 
     st.markdown(EDIT_TEXT_LABEL)
     st.markdown(OPENING_ITINERARY_CARD, unsafe_allow_html=True)
@@ -763,17 +763,17 @@ with tab1:
     # ─────────────────────────────────────────────────────────────────────────
     # OVERLAYS SECTION — only show after core itinerary exists
     # ─────────────────────────────────────────────────────────────────────────
-    st.markdown("### Add Smooth Landing overlays")
+    st.markdown("### Customize Your Itinerary")
     
     if not st.session_state.core_itinerary.strip():
-        st.info("Generate a core itinerary first, then come back here to add overlays.")
+        st.info("Create your base itinerary first to unlock customization options.")
         # Default profile flags when no itinerary yet
         profile_flags = {
             "safari": False, "halal": False, "nomad": False, "solo_female": False,
             "family": False, "luxury": False, "flights": False,
         }
     else:
-        st.caption("Now that you have a plan, pick the overlays that fit your style.")
+        st.caption("Choose which enhancements match your travel style.")
         
         # Check if solo traveller (hide family/group options)
         is_solo = new_traveller_type in ["solo female", "solo"]
@@ -818,7 +818,7 @@ with tab1:
             with cols[col_idx]:
                 profile_flags[key] = st.checkbox(label, key=f"new_{key}")
 
-        if st.button("Run overlays on this itinerary", key="btn_niche", use_container_width=True):
+        if st.button("Create Variations", key="btn_niche", use_container_width=True):
             _run_niche_overlays(
                 new_destination,
                 new_budget,
@@ -834,26 +834,26 @@ with tab1:
 
     # Display niche overlays
     if st.session_state.niche_itinerary.strip():
-        st.markdown("#### Smooth Landing overlay suggestions")
-        with st.expander("View overlays (formatted)", expanded=True):
+        st.markdown("#### Your Variations")
+        with st.expander("View Variations", expanded=True):
             st.markdown(_escape_dollars(st.session_state.niche_itinerary), unsafe_allow_html=False)
         
         col_overlay_actions = st.columns(2)
         with col_overlay_actions[0]:
-            st.button("✨ Append overlays to core plan", use_container_width=True, on_click=_append_overlays_to_core)
+            st.button("➕ Add to Your Itinerary", use_container_width=True, on_click=_append_overlays_to_core)
         
         with col_overlay_actions[1]:
-            st.button("🔄 Replace core plan with overlays", use_container_width=True, on_click=_replace_core_with_overlays)
+            st.button("✓ Use This Version", use_container_width=True, on_click=_replace_core_with_overlays)
         
-        st.caption("Or copy any parts you like and paste into your core itinerary above.")
+        st.caption("💡 Mix & match: copy sections you like and paste into your plan above.")
 
 
 # -----------------------------
 # TAB 2: ITINERARY TUNE‑UP FLOW
 # -----------------------------
 with tab2:
-    st.subheader("Tune an existing trip")
-    st.caption("Drop in any plan and Smooth Landing will gently stress‑test it, then add safety and comfort polish.")
+    st.subheader("Refine Any Plan")
+    st.caption("Paste an itinerary and we'll check feasibility, budget, safety—then make it better.")
 
     if "tune_itinerary" not in st.session_state:
         st.session_state.tune_itinerary = ""
@@ -862,23 +862,18 @@ with tab2:
 
     col_tune_top = st.columns([2, 1])
     with col_tune_top[0]:
-        st.markdown("#### Your current plan")
+        st.markdown("#### Paste Your Itinerary")
     with col_tune_top[1]:
-        st.button(
-            "Use core itinerary from Tab 1",
-            key="btn_pull_core",
-            use_container_width=True,
-            on_click=_pull_core_to_tune,
-        )
+        st.button("Load from Tab 1", key="btn_pull_core", use_container_width=True, on_click=_pull_core_to_tune)
 
     st.text_area(
-        "Paste or edit your itinerary for tune‑up",
+        "Paste or modify your itinerary",
         height=300,
         placeholder="Day 1: Arrival and check‑in…",
         key="tune_itinerary",
     )
 
-    st.markdown("#### Trip context")
+    st.markdown("#### Travel Details")
     col_ct1, col_ct2, col_ct3 = st.columns(3)
     with col_ct1:
         # Tune destination with airport search
@@ -927,7 +922,7 @@ with tab2:
     st.write("")
     col_tune_btn = st.columns([3, 1])
     with col_tune_btn[1]:
-        run_tune = st.button("Run tune‑up", key="btn_tune_up", use_container_width=True)
+        run_tune = st.button("Check & Refine", key="btn_tune_up", use_container_width=True)
 
     if run_tune:
         if not st.session_state.tune_itinerary.strip():
@@ -937,7 +932,7 @@ with tab2:
                 "Reviewing and smoothing your itinerary…",
                 expanded=False,
             ) as status:
-                status.write("Summarising your plan and checking realism, flow, and budget…")
+                status.write("Summarising your itinerary and checking realism, flow, and budget…")
                 tune_up_tasks = build_tune_up_tasks(
                     tune_destination,
                     tune_budget,
@@ -962,13 +957,13 @@ with tab2:
                 result_text = _to_text(result)
 
                 status.update(
-                    label="Smooth Landing tune‑up complete ✅",
+                    label="Plan checked & refined ✅",
                     state="complete",
                     expanded=False,
                 )
 
             st.success("Your trip just got a Smooth Landing ✨")
-            st.markdown("#### Tuned‑up itinerary and notes")
+            st.markdown("#### Refined Itinerary")
 
             # Store result in a separate key to avoid widget binding conflict
             st.session_state.tune_result = result_text
@@ -990,7 +985,7 @@ with tab2:
 
     # Display existing tune result if it exists (when navigating back to tab)
     elif st.session_state.tune_result.strip():
-        st.markdown("#### Previous tune‑up results")
+        st.markdown("#### Previous Results")
         with st.expander(ITINERARY_VIEW_LABEL, expanded=True):
             st.markdown(_escape_dollars(st.session_state.tune_result), unsafe_allow_html=False)
 
