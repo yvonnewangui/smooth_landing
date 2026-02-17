@@ -6,9 +6,7 @@ from agents.niche_agents import (
     digital_nomad_planner,
     solo_female_safety_advisor,
     family_travel_designer,
-    medical_tourism_planner,
     luxury_on_budget_finder,
-    visa_requirements_advisor,
     flight_advisor,
 )
 
@@ -119,9 +117,8 @@ def build_niche_tasks(
         "nomad": True,
         "solo_female": False,
         "family": False,
-        "medical": False,
         "luxury": True,
-        "visa": True,
+        "flights": False,
     }
 
     Each task produces a short section that can be appended or woven into
@@ -184,15 +181,6 @@ def build_niche_tasks(
             )
         )
 
-    if profile_flags.get("medical"):
-        niche_tasks.append(
-            Task(
-                description=f"Add medical overlay for {destination} ({days}d). Plan: {plan}. Facility proximity, rest days.",
-                agent=medical_tourism_planner,
-                expected_output="Medical overlay section.",
-            )
-        )
-
     if profile_flags.get("luxury"):
         niche_tasks.append(
             Task(
@@ -203,59 +191,6 @@ def build_niche_tasks(
         )
 
     # Optional: visa branch
-    if profile_flags.get("visa") and passport_country and trip_purpose:
-        visa_site = _get_visa_site(destination)
-        visa_site_line = f" Official visa site: {visa_site}" if visa_site else ""
-        
-        # Check if traveling within own country
-        passport_country_lower = passport_country.lower().strip()
-        destination_lower = destination.lower().strip()
-        is_domestic = (
-            passport_country_lower in destination_lower or 
-            destination_lower in passport_country_lower
-        )
-        
-        if is_domestic:
-            # Domestic travel - no visa needed
-            niche_tasks.append(
-                Task(
-                    description=(
-                        f"Visa requirements check: {passport_country} passport → {destination}. "
-                        f"This appears to be DOMESTIC travel (same country). "
-                        f"Provide a brief note: 1) No visa required for domestic travel, "
-                        f"2) Confirm what ID/documents are needed for domestic travel in {destination}, "
-                        f"3) Any domestic travel restrictions or permits if applicable."
-                    ),
-                    agent=visa_requirements_advisor,
-                    expected_output="Brief domestic travel note stating no visa required, required ID documents, any domestic travel notes.",
-                )
-            )
-        else:
-            # International travel - visa may be needed
-            niche_tasks.append(
-                Task(
-                    description=(
-                        f"Visa requirements: {passport_country} passport → {destination} "
-                        f"({trip_purpose}, {days}d from {start_date}).{visa_site_line} "
-                        f"CRITICAL ACCURACY REQUIRED: Visa policies change frequently. "
-                        f"1) ONLY use the official government website from the destination country for visa info. "
-                        f"2) If the official site is unclear or you cannot access it, recommend the user check the official embassy/consulate website directly. "
-                        f"3) DO NOT assume visa-free policies - verify them from OFFICIAL SOURCES ONLY. "
-                        f"4) Include: visa type (or 'Check official sources' if uncertain), required documents, application steps, fees in USD, processing time, official website link. "
-                        f"5) For any uncertainty, add a clear warning to verify directly with the official source. "
-                        f"6) Be conservative: if you cannot confirm a policy from an official source, state that verification is needed."
-                    ),
-                    agent=visa_requirements_advisor,
-                    expected_output=(
-                        "Accurate visa checklist from official government sources only. "
-                        "Include: visa type (or clear statement to verify with official embassy), required documents, "
-                        "application steps, fees in USD, processing time, official application website link. "
-                        "Add warning if any information could not be verified from official sources. "
-                        "IMPORTANT: If information appears outdated or uncertain, recommend user verify directly with the destination country's official embassy/consulate website."
-                    ),
-                )
-            )
-
     if profile_flags.get("flights") and home_airport:
         from datetime import datetime as _dt
         _now = _dt.now().strftime("%Y-%m-%d %H:%M")

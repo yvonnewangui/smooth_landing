@@ -17,6 +17,8 @@ from agents.core_agents import (
     itinerary_coordinator,
     trip_verifier,
     local_insider,
+    visa_requirements_advisor,
+    health_wellness_advisor,
 )
 from agents.niche_agents import (
     safari_specialist,
@@ -24,9 +26,7 @@ from agents.niche_agents import (
     digital_nomad_planner,
     solo_female_safety_advisor,
     family_travel_designer,
-    medical_tourism_planner,
     luxury_on_budget_finder,
-    visa_requirements_advisor,
     flight_advisor,
 )
 
@@ -344,71 +344,113 @@ def _run_niche_overlays(destination, budget, days, interests, profile_flags, sta
         return
 
     with st.status("Layering in Smooth Landing extras…", expanded=False) as status:
-        status.write("Preparing niche tasks based on your profile switches…")
-        niche_tasks = build_niche_tasks(
-            destination,
-            budget,
-            int(days),
-            interests,
-            profile_flags,
-            start_date,
-            passport_country,
-            trip_purpose,
-            home_airport,
-            core_itinerary,
-            airports=COMMON_AIRPORTS,
-        )
+        status.write("Calling in the specialists…")
+        status.write("⏳ Spacing out requests to respect API rate limits (one specialist per second)…")
+        
+        overlay_results = []
+        
+        # Safari overlay
+        if profile_flags.get("safari"):
+            status.write("🦁 Safari specialist working…")
+            niche_tasks = build_niche_tasks(destination, budget, int(days), interests, {"safari": True, "halal": False, "nomad": False, "solo_female": False, "family": False, "luxury": False, "flights": False}, start_date, passport_country, trip_purpose, home_airport, core_itinerary, airports=COMMON_AIRPORTS)
+            crew = Crew(agents=[safari_specialist], tasks=[t for t in niche_tasks if t.agent == safari_specialist], verbose=False)
+            result = _to_text(crew.kickoff())
+            if result.strip():
+                overlay_results.append(f"## Safari\n\n{result}")
+            time.sleep(1)
+        
+        # Halal overlay
+        if profile_flags.get("halal"):
+            status.write("🕌 Halal-friendly specialist working…")
+            niche_tasks = build_niche_tasks(destination, budget, int(days), interests, {"safari": False, "halal": True, "nomad": False, "solo_female": False, "family": False, "luxury": False, "flights": False}, start_date, passport_country, trip_purpose, home_airport, core_itinerary, airports=COMMON_AIRPORTS)
+            crew = Crew(agents=[halal_travel_expert], tasks=[t for t in niche_tasks if t.agent == halal_travel_expert], verbose=False)
+            result = _to_text(crew.kickoff())
+            if result.strip():
+                overlay_results.append(f"## Halal-Friendly\n\n{result}")
+            time.sleep(1)
+        
+        # Nomad overlay
+        if profile_flags.get("nomad"):
+            status.write("💻 Digital nomad specialist working…")
+            niche_tasks = build_niche_tasks(destination, budget, int(days), interests, {"safari": False, "halal": False, "nomad": True, "solo_female": False, "family": False, "luxury": False, "flights": False}, start_date, passport_country, trip_purpose, home_airport, core_itinerary, airports=COMMON_AIRPORTS)
+            crew = Crew(agents=[digital_nomad_planner], tasks=[t for t in niche_tasks if t.agent == digital_nomad_planner], verbose=False)
+            result = _to_text(crew.kickoff())
+            if result.strip():
+                overlay_results.append(f"## Digital Nomad\n\n{result}")
+            time.sleep(1)
+        
+        # Safety overlay (always runs solo_female agent for consistency)
+        if profile_flags.get("solo_female"):
+            status.write("👩 Solo female safety specialist working…")
+        else:
+            status.write("🛡️ Safety specialist working…")
+        niche_tasks = build_niche_tasks(destination, budget, int(days), interests, {"safari": False, "halal": False, "nomad": False, "solo_female": profile_flags.get("solo_female", False), "family": False, "luxury": False, "flights": False}, start_date, passport_country, trip_purpose, home_airport, core_itinerary, airports=COMMON_AIRPORTS)
+        crew = Crew(agents=[solo_female_safety_advisor], tasks=[t for t in niche_tasks if t.agent == solo_female_safety_advisor], verbose=False)
+        result = _to_text(crew.kickoff())
+        if result.strip():
+            label = "Solo Female Safety" if profile_flags.get("solo_female") else "Safety"
+            overlay_results.append(f"## {label}\n\n{result}")
+        time.sleep(1)
+        
+        # Family overlay
+        if profile_flags.get("family"):
+            status.write("👨‍👩‍👧‍👦 Family travel specialist working…")
+            niche_tasks = build_niche_tasks(destination, budget, int(days), interests, {"safari": False, "halal": False, "nomad": False, "solo_female": False, "family": True, "luxury": False, "flights": False}, start_date, passport_country, trip_purpose, home_airport, core_itinerary, airports=COMMON_AIRPORTS)
+            crew = Crew(agents=[family_travel_designer], tasks=[t for t in niche_tasks if t.agent == family_travel_designer], verbose=False)
+            result = _to_text(crew.kickoff())
+            if result.strip():
+                overlay_results.append(f"## Family Travel\n\n{result}")
+            time.sleep(1)
+        
 
-        niche_agents = []
-        if profile_flags["safari"]:
-            niche_agents.append(safari_specialist)
-        if profile_flags["halal"]:
-            niche_agents.append(halal_travel_expert)
-        if profile_flags["nomad"]:
-            niche_agents.append(digital_nomad_planner)
-        # safety agent always added (solo_female branch or general)
-        niche_agents.append(solo_female_safety_advisor)
-        if profile_flags["family"]:
-            niche_agents.append(family_travel_designer)
-        if profile_flags["medical"]:
-            niche_agents.append(medical_tourism_planner)
-        if profile_flags["luxury"]:
-            niche_agents.append(luxury_on_budget_finder)
-        if profile_flags["visa"] and passport_country.strip():
-            niche_agents.append(visa_requirements_advisor)
-        if profile_flags["flights"] and home_airport.strip():
-            niche_agents.append(flight_advisor)
+        # Luxury overlay
+        if profile_flags.get("luxury"):
+            status.write("✨ Luxury-on-budget specialist working…")
+            niche_tasks = build_niche_tasks(destination, budget, int(days), interests, {"safari": False, "halal": False, "nomad": False, "solo_female": False, "family": False, "luxury": True, "flights": False}, start_date, passport_country, trip_purpose, home_airport, core_itinerary, airports=COMMON_AIRPORTS)
+            crew = Crew(agents=[luxury_on_budget_finder], tasks=[t for t in niche_tasks if t.agent == luxury_on_budget_finder], verbose=False)
+            result = _to_text(crew.kickoff())
+            if result.strip():
+                overlay_results.append(f"## Luxury on Budget\n\n{result}")
+            time.sleep(1)
+        
 
-        if not niche_agents:
+        # Flights overlay
+        if profile_flags.get("flights") and home_airport.strip():
+            status.write("✈️ Flight advisor working…")
+            niche_tasks = build_niche_tasks(destination, budget, int(days), interests, {"safari": False, "halal": False, "nomad": False, "solo_female": False, "family": False, "luxury": False, "flights": True}, start_date, passport_country, trip_purpose, home_airport, core_itinerary, airports=COMMON_AIRPORTS)
+            crew = Crew(agents=[flight_advisor], tasks=[t for t in niche_tasks if t.agent == flight_advisor], verbose=False)
+            result = _to_text(crew.kickoff())
+            if result.strip():
+                overlay_results.append(f"## Flight Advisor\n\n{result}")
+            time.sleep(1)
+        
+        if overlay_results:
+            niche_text = "\n\n---\n\n".join(overlay_results)
+            status.update(
+                label="Smooth Landing overlays ready ✅",
+                state="complete",
+                expanded=False,
+            )
+            st.session_state.niche_itinerary = niche_text
+        else:
             status.update(
                 label="No overlays selected.",
                 state="error",
                 expanded=False,
             )
             st.error("Please switch on at least one Smooth Landing profile above.")
-        else:
-            status.write("Calling in the specialists…")
-            status.write("⏳ Spacing out requests to respect API rate limits (one specialist per second)…")
-            
-            # Add delay to prevent rate limiting on Groq API
-            time.sleep(1)
-            
-            crew = Crew(
-                agents=niche_agents,
-                tasks=niche_tasks,
-                verbose=False,
-            )
 
-            niche_result = crew.kickoff()
-            niche_text = _to_text(niche_result)
 
-            status.update(
-                label="Smooth Landing overlays ready ✅",
-                state="complete",
-                expanded=False,
-            )
+def _append_overlays_to_core():
+    """Callback: append niche overlays to core itinerary."""
+    st.session_state.core_itinerary = (
+        st.session_state.core_itinerary + "\n\n---\n\n" + st.session_state.niche_itinerary
+    )
 
-            st.session_state.niche_itinerary = niche_text
+
+def _replace_core_with_overlays():
+    """Callback: replace core itinerary with niche overlays."""
+    st.session_state.core_itinerary = st.session_state.niche_itinerary
 
 
 def _to_text(result):
@@ -422,6 +464,11 @@ def _to_text(result):
             return str(result["raw"])
         if "output" in result:
             return str(result["output"])
+    # Handle CrewAI Output object
+    if hasattr(result, "raw"):
+        return str(result.raw)
+    if hasattr(result, "output"):
+        return str(result.output)
     return str(result)
 
 
@@ -661,10 +708,13 @@ with tab1:
                     new_raw_preferences,
                     new_start_date,
                     will_fly = will_fly,
+                    passport_country = passport_country,
                 )
 
                 core_agents = [
                     destination_researcher,
+                    visa_requirements_advisor,
+                    health_wellness_advisor,
                     accommodation_planner,
                     activities_planner,
                     transport_planner,
@@ -719,7 +769,7 @@ with tab1:
         # Default profile flags when no itinerary yet
         profile_flags = {
             "safari": False, "halal": False, "nomad": False, "solo_female": False,
-            "family": False, "medical": False, "luxury": False, "visa": False, "flights": False,
+            "family": False, "luxury": False, "flights": False,
         }
     else:
         st.caption("Now that you have a plan, pick the overlays that fit your style.")
@@ -752,15 +802,13 @@ with tab1:
         if not is_solo:
             options_to_show.append(("Family with kids", "family"))
         
-        options_to_show.append(("Medical tourism", "medical"))
         options_to_show.append(("Luxury on a budget", "luxury"))
-        options_to_show.append(("Visa & entry requirements", "visa"))
         options_to_show.append(("Flight advisor", "flights"))
         
         # Create columns dynamically - 3 items per row, no gaps
         profile_flags = {
             "safari": False, "halal": False, "nomad": False, "solo_female": False,
-            "family": False, "medical": False, "luxury": False, "visa": False, "flights": False,
+            "family": False, "luxury": False, "flights": False,
         }
         
         cols = st.columns(3)
@@ -788,7 +836,15 @@ with tab1:
         st.markdown("#### Smooth Landing overlay suggestions")
         with st.expander("View overlays (formatted)", expanded=True):
             st.markdown(_escape_dollars(st.session_state.niche_itinerary), unsafe_allow_html=False)
-        st.caption("Copy any parts you like into your core itinerary above, then regenerate or tune.")
+        
+        col_overlay_actions = st.columns(2)
+        with col_overlay_actions[0]:
+            st.button("✨ Append overlays to core plan", use_container_width=True, on_click=_append_overlays_to_core)
+        
+        with col_overlay_actions[1]:
+            st.button("🔄 Replace core plan with overlays", use_container_width=True, on_click=_replace_core_with_overlays)
+        
+        st.caption("Or copy any parts you like and paste into your core itinerary above.")
 
 
 # -----------------------------

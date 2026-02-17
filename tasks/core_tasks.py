@@ -7,21 +7,9 @@ from agents.core_agents import (
     itinerary_coordinator,
     trip_verifier,
     local_insider,
+    visa_requirements_advisor,
+    health_wellness_advisor,
 )
-
-
-def build_profile_task(traveller_type: str, raw_preferences: str):
-    """
-    traveller_type: 'solo female', 'solo', 'family', etc.
-    raw_preferences: free text from user, e.g. 'hate hostels, love food tours, mid-range budget'
-    """
-    description = f"Profile: {traveller_type}. Preferences: {raw_preferences}"
-
-    return Task(
-        description=description,
-        agent=destination_researcher,
-        expected_output="Profile bullet list."
-    )
 
 
 def build_core_tasks(
@@ -33,15 +21,14 @@ def build_core_tasks(
     raw_preferences: str,
     start_date,
     will_fly: bool = False,
+    passport_country: str = None,
 ):
-    # 1) Profile
-    profile_task = build_profile_task(traveller_type, raw_preferences)
-
-    # 2) Research (uses profile)
+    # 1) Research (account for traveller profile: {traveller_type}, preferences: {raw_preferences})
     fly_note = "(Will fly in/out)" if will_fly else ""
     research_task = Task(
         description=(
-            f"Research {destination} {fly_note}: safety, neighborhoods, costs, transport. "
+            f"Research {destination} {fly_note} for a {traveller_type} traveler with preferences: {raw_preferences}. "
+            f"Focus on: safety, neighborhoods, costs, transport, and activity fit for their interests. "
             f"\n\n"
             f"CRITICAL - MUST DO ALL THREE PARTS:\n"
             f"1) GENERAL INFO: safety notes, neighborhoods, costs, local transport options.\n"
@@ -55,7 +42,6 @@ def build_core_tasks(
             f"Do NOT call brave_search or any tool not in your tools list."
         ),
         agent=destination_researcher,
-        context=[profile_task],
         expected_output=(
             f"MUST INCLUDE:\n"
             f"1) Safety notes and travel tips\n"
@@ -67,7 +53,82 @@ def build_core_tasks(
         )
     )
 
-    # 3) Accommodation
+    # 3) Visa Requirements (CORE)
+    visa_task = Task(
+        description=(
+            f"Visa requirements for {passport_country or 'traveler'} passport → {destination} ({traveller_type}, {days}d from {start_date}). "
+            f"CRITICAL ACCURACY REQUIRED: "
+            f"1) ONLY use official government websites from {destination}'s immigration authority. "
+            f"2) If the official site is unclear or you cannot access it, recommend checking the official embassy/consulate directly. "
+            f"3) DO NOT assume visa-free policies - VERIFY from official sources only. "
+            f"4) Include: visa type (or 'Check official sources' if uncertain), required documents, application steps, fees in USD, processing time. "
+            f"5) For any uncertainty, add a clear warning to verify directly with official source. "
+            f"6) Be conservative: if you cannot confirm a policy, state that verification is needed."
+        ),
+        agent=visa_requirements_advisor,
+        context=[research_task],
+        expected_output=(
+            f"Visa requirements checklist from official government sources only. "
+            f"Include: visa type, required documents, application process, fees (USD), processing time, official website link. "
+            f"If information is unclear or not verifiable, recommend consulting official embassy/consulate directly."
+        )
+    )
+
+    # 4) Health & Wellness Requirements (CORE)
+    health_task = Task(
+        description=(
+            f"Comprehensive health and wellness requirements for {destination} ({traveller_type}, {days}d from {start_date}). "
+            f"Research from WHO, CDC, and official health authorities. PROVIDE DETAILED, COMPREHENSIVE OUTPUT. "
+            f"CRITICAL SECTIONS (all required, all MUST BE DETAILED): "
+            f"1) VACCINES/IMMUNIZATIONS - List EVERY required or recommended vaccine with details: "
+            f"   - Which vaccines (MMR, typhoid, hepatitis A/B, yellow fever, etc.) "
+            f"   - When to get them (how far in advance before travel) "
+            f"   - Why they're needed for this destination "
+            f"2) DISEASE RISKS - Detailed overview: "
+            f"   - Malaria: risk areas, transmission season, prophylaxis medications and timing "
+            f"   - Dengue, yellow fever, typhoid, etc. if applicable: risk level, prevention methods "
+            f"   - Include which regions/seasons are highest risk in {destination} "
+            f"3) WATER & FOOD SAFETY - Detailed guidance: "
+            f"   - Safe water (bottled, filtered, boiled) and proper handling "
+            f"   - Food safety practices specific to {destination} "
+            f"   - Common foodborne illnesses and how to avoid them "
+            f"   - Restaurants/areas to avoid if applicable "
+            f"4) COMMON ILLNESSES & PREVENTION - For {destination} specifically: "
+            f"   - Most common travel illnesses (traveler's diarrhea, etc.) "
+            f"   - How they spread and prevention methods "
+            f"   - Symptoms and when to seek medical help "
+            f"5) HEALTHCARE QUALITY & ACCESS - {destination} details: "
+            f"   - Quality of hospitals/clinics in major cities "
+            f"   - Quality in remote areas "
+            f"   - Cost of healthcare "
+            f"   - Availability of specific medications "
+            f"   - Evacuation/repatriation services if needed "
+            f"6) TRAVEL MEDICAL INSURANCE - Detailed recommendations: "
+            f"   - Why it's essential for {destination} "
+            f"   - What coverage to look for (medical evacuation, emergency treatment costs) "
+            f"   - Cost estimates and providers "
+            f"7) SPECIFIC PRECAUTIONS FOR {traveller_type.upper()} - Age/type-specific guidance. "
+            f"CRITICAL: Provide FULL SENTENCES with explanations, not bullet-point summaries. "
+            f"Include specific medication names, dosages, timing. Include cost estimates where relevant. "
+            f"Recommend consulting healthcare provider 4-6 weeks before travel for personalized advice."
+        ),
+        agent=health_wellness_advisor,
+        context=[research_task],
+        expected_output=(
+            f"COMPREHENSIVE health requirements for {destination} with detailed sections: "
+            f"(1) VACCINES/IMMUNIZATIONS with specific names, timing, reasons; "
+            f"(2) DISEASE RISKS with malaria/dengue/typhoid details, seasonal timing, prophylaxis options; "
+            f"(3) WATER & FOOD SAFETY with specific guidelines for {destination}; "
+            f"(4) COMMON ILLNESSES & PREVENTION specific to this destination; "
+            f"(5) HEALTHCARE QUALITY & ACCESS in {destination} cities and remote areas; "
+            f"(6) TRAVEL MEDICAL INSURANCE recommendations with specifics; "
+            f"(7) SPECIFIC PRECAUTIONS for {traveller_type} travelers. "
+            f"MUST use full sentences with explanations. MUST NOT be abbreviated or bullet-point-only. "
+            f"Include medication names, dosages, timing. Include cost info. Include recommendation to see healthcare provider 4-6 weeks before travel."
+        )
+    )
+
+    # 5) Accommodation
     budget_for_stay = budget * 0.35
     per_day_stay = budget_for_stay / days
     accommodation_task = Task(
@@ -93,12 +154,18 @@ def build_core_tasks(
             f"Schedule activities based on the ACTUAL TRAVEL DATES ({start_date}, {days} days). "
             f"Consider weather/season—check research for weather forecast and adjust activity suggestions accordingly. "
             f"For outdoor activities, suggest indoor alternatives if rain is forecasted. "
+            f"CRITICAL - ACTIVITY SPECIFICITY: Do NOT suggest vague activities like 'Dinner at a local restaurant' or 'Visit a market'. "
+            f"Instead, provide SPECIFIC, NAMED recommendations: "
+            f"\n- SPECIFIC VENUES: Name actual restaurants, museums, landmarks (e.g., 'Taj Mahal', 'Joe's Pizza', 'Old Town Market' instead of 'a restaurant'). "
+            f"\n- WHAT TO DO: Clearly describe the experience (e.g., 'Try local biryani at famous family-run restaurant' vs 'eat dinner'). "
+            f"\n- WHY IT MATTERS: Include why visitors should go (local specialty, historic significance, best views, food culture, etc.). "
+            f"\n- PRACTICAL INFO: Add hours, booking tips, dress code, or peak visit times when relevant. "
             f"CRITICAL: Group activities by geographic proximity. Each day's activities must be close to each other to minimize travel time. "
             f"2-3 activities/day max, cluster in same neighborhood, balance active/light based on weather. Avoid backtracking across the city."
         ),
         agent=activities_planner,
         context=[research_task],
-        expected_output="Day-by-day activities scheduled for {start_date} with timing, energy level, geographic clustering. Include indoor/outdoor options based on weather forecast."
+        expected_output="Day-by-day activities scheduled for {start_date} with timing, energy level, geographic clustering. Each activity must include: specific venue name, what to do there, why it's worth experiencing, and practical details. Include indoor/outdoor options based on weather forecast. NO vague activity descriptions."
     )
 
     # 5) Transport
@@ -126,6 +193,12 @@ def build_core_tasks(
             f"Minimize travel between locations within each day. Route activities geographically (e.g., north → south) to avoid backtracking. "
             f"Keep realistic pace (no >12hr days). All costs in USD. "
             f"CRITICAL: Create activities for ALL {days} days. Do not leave any day empty or with just headings. "
+            f"NEVER USE ABBREVIATIONS OR PLACEHOLDERS (no '[...continues...]', '[see above]', '[complete details below]', 'etc.', etc.). "
+            f"ALWAYS PROVIDE FULL, COMPLETE OUTPUT for every single day. "
+            f"ACTIVITY SPECIFICITY CRITICAL: Use SPECIFIC venue names and clear descriptions, NOT vague labels. "
+            f"✗ AVOID: 'Visit a market', 'Dinner at restaurant', 'Go shopping' "
+            f"✓ USE: 'Explore Old Town Spice Market' or 'Dinner at Chef Marco's seafood restaurant, famous for local catch'. "
+            f"For each activity in the 'Activity' column: include the specific venue name and a brief description of what to do there. "
             f"OUTPUT FORMAT - MUST USE EXACT MARKDOWN TABLE FORMAT:"
             f"\n\n## Day 1\n\n"
             f"| Time | Activity | Location | Transport | Cost (USD) | Comment |\n"
@@ -135,7 +208,8 @@ def build_core_tasks(
             f"| 1:00 PM | Lunch at market | Downtown | Walking | $12 | Traditional food, busy area |\n\n"
             f"## Day 2\n\n"
             f"[Next table with same format]\n\n"
-            f"REQUIREMENTS: Use pipes (|), include separator row (| --- |), add activities for every single day 1 through {days}."
+            f"REQUIREMENTS: Use pipes (|), include separator row (| --- |), add activities for every single day 1 through {days}. "
+            f"DO NOT PUT '[Complete itinerary below]' or similar placeholders or abbreviated forms. Include the FULL itinerary here."
             f"\nCOMMENT GUIDELINES: For each activity, add a helpful comment that includes:"
             f"\n- Brief activity description OR value (e.g., 'Scenic viewpoint', 'Local market, peak hours 8-11am', 'Highly rated, book ahead')"
             f"\n- Realistic experience level (e.g., 'Easy walk', 'Moderate climbing', 'Peaceful spot')"
@@ -143,8 +217,8 @@ def build_core_tasks(
             f"\nDO NOT write generic comments like 'Below budget' or 'Within allocation'—be specific about the activity."
         ),
         agent=itinerary_coordinator,
-        context=[research_task, accommodation_task, activities_task, transport_task],
-        expected_output=f"Complete markdown itinerary with activities for ALL {days} days. Each day must have: ## Day X heading, blank line, proper markdown table with pipes (|) and separator row (| --- |), then blank line before next day. Columns: Time | Activity | Location | Transport | Cost (USD) | Comment. All activities per day grouped in same geographic area. Total cost must fit in ${budget}. Comments must be descriptive about activity value/experience, NOT budget status. NO EMPTY DAYS - every day 1 through {days} must have activities."
+        context=[research_task, visa_task, health_task, accommodation_task, activities_task, transport_task],
+        expected_output=f"Complete markdown itinerary WITH VISA & HEALTH SECTIONS at top, then activities for ALL {days} days. Each day must have: ## Day X heading, blank line, proper markdown table with pipes (|) and separator row (| --- |), then blank line before next day. Columns: Time | Activity | Location | Transport | Cost (USD) | Comment. ALL ACTIVITY NAMES MUST BE SPECIFIC AND CLEAR: Include venue names and 'what to do' descriptions (e.g., 'Visit Old Town Market' or 'Dinner at Marco's Seafood Restaurant'), NOT generic labels like 'Go to a market' or 'Have dinner'. All activities per day grouped in same geographic area. Total cost must fit in ${budget}. Comments must be descriptive about activity value/experience, NOT budget status. NO EMPTY DAYS - every day 1 through {days} must have activities. NO ABBREVIATIONS, PLACEHOLDERS, OR SHORTENED FORMS - OUTPUT MUST BE COMPLETE AND DETAILED."
     )
 
     # 7) Verification (scores + light edits)
@@ -167,33 +241,37 @@ def build_core_tasks(
     local_insights_task = Task(
         description=(
             f"Polish itinerary for {destination} ({days}d from {start_date}, ${budget} USD HARD BUDGET). "
+            f"STRUCTURE (in this order): "
+            f"\n1. TRIP SNAPSHOT at the very top: travel dates, weather overview, budget breakdown by category. "
+            f"\n2. VISA REQUIREMENTS section: visa type, required documents, application process, fees USD, processing time, official website. "
+            f"\n3. HEALTH & WELLNESS section: required/recommended vaccines, disease risks, water/food safety, healthcare facilities, travel insurance. "
+            f"\n4. ACCOMMODATION section: recommended hotels/lodging options from previous agent output. "
+            f"\n5. DAILY ITINERARY: Full day-by-day activity schedule for all {days} days (see formatting below). "
+            f"\n6. WEATHER FORECAST section: summary for travel dates ({start_date}, {days} days). "
+            f"\n7. PACKING LIST section with SPECIFIC recommendations based on weather and {destination}. "
+            f"\n8. SAFETY TIPS section. "
+            f"\n9. COST BREAKDOWN section showing per-day allocations. "
+            f"Each section must be followed by a BLANK LINE. "
             f"BUDGET ALLOCATIONS: ~${per_day_stay:.0f}/night accommodation, ~${per_day_activities:.0f}/day activities+meals, ~${per_day_transport:.0f}/day transport. "
-            f"CRITICAL 1: Ensure per-day costs stay within allocations AND total trip cost ≤ ${budget}. If over, cut/reduce activities or lodging. "
-            f"CRITICAL 2: Verify each day's activities are grouped by geographic area—no backtracking across the city. "
-            "Activities within the same day should be clustered (same neighborhood/zone). "
-            f"CRITICAL 3: Include WEATHER SECTION showing forecast summary for travel dates ({start_date}, {days} days). "
-            f"CRITICAL 4: Add PACKING LIST section with SPECIFIC recommendations based on weather forecast and destination {destination}. "
-            f"Include temperature range, rain probability, humidity, and activity type. List items specific to {destination} weather conditions. "
-            f"Example: 'Lightweight breathable clothing for {destination}s hot/humid climate', 'Waterproof bag for rainy season', NOT generic 'comfortable shoes'. "
-            f"Add: trip snapshot at top showing travel dates, weather overview, budget breakdown, safety tips, per-day cost breakdown showing totals ≤ allocations, local hacks. "
-            f"FORMATTING CRITICAL: Each major section should be followed by a BLANK LINE. Keep daily plan as SEPARATE TABLES per day:"
-            f"\n- Use '## Day X' heading"
-            f"\n- Add a BLANK LINE after the heading"
-            f"\n- Then the markdown table with proper pipes (|) and separator row (| --- | --- | ... |)"
-            f"\n- Add BLANK LINE after each table before the next day heading"
-            f"\nFOR COMMENTS: Each row's comment should describe the activity (what to do, why it's worth it), experience level, or helpful logistics—NOT budget status. "
-            f"Example good comments: 'Best local market in the area, peak hours 7-11am', 'Scenic viewpoint, easy 15min walk', 'Visit early to avoid crowds'. "
-            f"Example BAD comments: 'Below budget', 'Within allocation', 'Affordable option'—these add no value. "
+            f"CRITICAL: Ensure per-day costs stay within allocations AND total trip cost ≤ ${budget}. If over, cut/reduce activities or lodging. "
+            f"DAILY FORMAT: Each day uses '## Day X' heading, BLANK LINE, then metrics line 'Feasibility: X/5 | Safety: X/5 | Budget Adherence: X/1 | Per-day Fit: X/1 | Geographic Flow: [locations]', BLANK LINE, then markdown table. "
+            f"TABLE COLUMNS ONLY: Time, Activity, Location, Transport, Cost (USD), Comment. "
+            f"CRITICAL: All activities MUST BE SPECIFIC with venue names (✗ NEVER 'Visit market' ✓ ALWAYS 'Explore Old Town Spice Market'). "
+            f"Each day's activities must be grouped by geographic area—no backtracking across the city. "
+            f"Comments describe the activity (what to do, why worth it, experience level), NOT budget status. "
+            f"PACKING LIST: Include temperature range, humidity, activity type. Items specific to {destination} conditions, NOT generic advice. "
+            f"NEVER USE ABBREVIATIONS OR PLACEHOLDERS like '[...continues...]', 'etc.', '[see above]'. PROVIDE FULL, COMPLETE OUTPUT FOR EVERY DAY AND SECTION. "
             f"All costs in USD. FINAL OUTPUT MUST NOT EXCEED ${budget} AND MUST STAY WITHIN PER-DAY ALLOCATIONS."
         ),
         agent=local_insider,
-        context=[verification_task],
-        expected_output=f"Final itinerary with: snapshot (travel dates, weather overview, per-day allocations), BLANK LINES between sections, weather forecast section, packing list with destination and weather-specific recommendations, safety, separate table per day preceded by ## Day X heading (activities clustered, with descriptive comments), cost breakdown (per-day ≤ allocations, total ≤ ${budget}), tips. Use proper markdown formatting with BLANK LINES between major sections and after each table. All costs in USD. Comments should be descriptive and helpful, NOT mention budget status."
+        context=[verification_task, visa_task, health_task],
+        expected_output=f"Final itinerary structure: \n1. Trip Snapshot (travel dates, weather, budget breakdown)\n2. Visa Requirements (type, documents, process, fees USD, processing time)\n3. Health & Wellness (vaccines, disease risks, water/food safety, healthcare)\n4. Accommodation Options\n5. Daily Itinerary (## Day X heading, metrics line, activity table with Time|Activity|Location|Transport|Cost|Comment) for ALL {days} days\n6. Weather Forecast\n7. Packing List (specific to {destination} weather)\n8. Safety Tips\n9. Cost Breakdown. BLANK LINES between sections. All activity names specific with venue names. Markdown formatted. All costs USD. NO ABBREVIATIONS."
     )
 
     return [
-        profile_task,
         research_task,
+        visa_task,
+        health_task,
         accommodation_task,
         activities_task,
         transport_task,

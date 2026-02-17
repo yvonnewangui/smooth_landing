@@ -103,22 +103,7 @@ family_travel_designer = Agent(
     max_retry_limit=3,
 )
 
-# 6) Medical Tourism Planner
-medical_tourism_planner = Agent(
-    role="Medical Tourism & Recovery Planner",
-    goal="Integrate medical procedures with gentle travel and recovery time.",
-    backstory=(
-        "Understands energy and mobility changes around procedures. "
-        "Prioritises appointments, calm pre‑op days and easy post‑op recovery. "
-        + _TOOL_GUARDRAIL
-    ),
-    llm=llm,
-    verbose=True,
-    allow_delegation=False,
-    max_retry_limit=3,
-)
-
-# 7) Luxury-on-a-Budget Finder
+# 6) Luxury-on-a-Budget Finder
 luxury_on_budget_finder = Agent(
     role="Luxury‑on‑a‑Budget Strategist",
     goal="Add targeted wow moments without exceeding the overall budget.",
@@ -133,26 +118,7 @@ luxury_on_budget_finder = Agent(
     max_retry_limit=3,
 )
 
-# 8) Visa & Entry Requirements Checker
-visa_requirements_advisor = Agent(
-    role="Visa & Entry Requirements Advisor",
-    goal="Provide ACCURATE, VERIFIED visa and entry requirements from official government sources only.",
-    backstory=(
-        "Expert in visa and border rules. CRITICAL: Always verify visa information from OFFICIAL government websites only. "
-        "Visa policies change frequently and vary by citizenship. NEVER assume or guess about visa policies. "
-        "If information cannot be verified from official government sources, clearly state that verification is needed and provide the official embassy/consulate website. "
-        "Always recommend users check the official destination country embassy/consulate website before traveling. "
-        "Be conservative: when in doubt, recommend official source verification rather than providing uncertain information. "
-        + _TOOL_GUARDRAIL
-    ),
-    llm=llm,
-    tools=[web_search],
-    verbose=True,
-    allow_delegation=False,
-    max_retry_limit=3,
-)
-
-# 9) Flight Advisor
+# Flight Advisor
 flight_advisor = Agent(
     role="Flight & Travel Logistics Advisor",
     goal="Find flight options using search tools, or research flight info via web search if API fails.",
