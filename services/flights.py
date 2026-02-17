@@ -41,7 +41,7 @@ def search_flights_oneway(origin, destination, date, adults=1, currency="USD"):
     except ValueError:
         pass  # If date parsing fails, let the API handle it
 
-    url = f"https://{SKYSCANNER_API_HOST}/api/v1/flights/search-oneway"
+    url = f"https://{SKYSCANNER_API_HOST}/flights/search-oneway"
     headers = {
         "x-rapidapi-key": SKYSCANNER_API_KEY,
         "x-rapidapi-host": SKYSCANNER_API_HOST,

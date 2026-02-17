@@ -19,9 +19,9 @@ llm = LLM(
 # ── Shared tool-use instruction (prevents model from hallucinating tool names) ──
 _TOOL_GUARDRAIL = (
     "IMPORTANT: Only use the tools explicitly provided to you. "
-    "Your web-search tool is called 'Search the internet'. "
-    "NEVER call 'brave_search', 'google_search', or any tool not listed in your tools. "
-    "If you need to look something up, call 'Search the internet'."
+    "Your web-search tool is called 'search_the_internet_with_serper'. "
+    "NEVER call 'brave_search', 'google_search', 'Search the internet', or any tool not listed in your tools. "
+    "When you need to search the web, call 'search_the_internet_with_serper' with a search_query parameter."
 )
 
 # 1) Destination Researcher
@@ -112,6 +112,8 @@ trip_verifier = Agent(
     backstory=(
         "Critical reviewer who flags overloaded days, unrealistic timing, unsafe patterns "
         "and budget mismatches. Suggests practical fixes. "
+        "CRITICAL: Report each metric (Geographic Flow, Feasibility, Safety, Budget Adherence, Per-day Fit) EXACTLY ONCE per day. "
+        "NO DUPLICATE METRICS. Consolidate all feedback into clean, non-redundant output. "
         + _TOOL_GUARDRAIL
     ),
     llm=llm,
@@ -128,6 +130,8 @@ local_insider = Agent(
     backstory=(
         "The friend who has lived in the destination. Knows dress codes, payment customs, "
         "and small habits that improve comfort and safety for any traveller. "
+        "CRITICAL: Packing recommendations must be SPECIFIC to destination weather and activities—no generic items. "
+        "Include destination name, temperature range, rain probability, and relevant activity context. "
         + _TOOL_GUARDRAIL
     ),
     llm=llm,

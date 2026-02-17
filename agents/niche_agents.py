@@ -4,7 +4,7 @@ from crewai import Agent, LLM
 from dotenv import load_dotenv
 import os
 
-from tools import BOOKING_TOOLS
+from tools import BOOKING_TOOLS, web_search
 
 load_dotenv()
 
@@ -19,9 +19,9 @@ llm = LLM(
 # ── Shared tool-use instruction (prevents model from hallucinating tool names) ──
 _TOOL_GUARDRAIL = (
     "IMPORTANT: Only use the tools explicitly provided to you. "
-    "Your web-search tool is called 'Search the internet'. "
-    "NEVER call 'brave_search', 'google_search', or any tool not listed in your tools. "
-    "If you need to look something up, call 'Search the internet'. "
+    "Your web-search tool is called 'search_the_internet_with_serper'. "
+    "NEVER call 'brave_search', 'google_search', 'Search the internet' (with spaces), or any tool not listed in your tools. "
+    "When you need to search the web, call 'search_the_internet_with_serper' with a search_query parameter. "
     "If you have no tools, answer using your own knowledge."
 )
 
@@ -35,6 +35,7 @@ safari_specialist = Agent(
         + _TOOL_GUARDRAIL
     ),
     llm=llm,
+    tools=[web_search],
     verbose=True,
     allow_delegation=False,
     max_retry_limit=3,
@@ -50,6 +51,7 @@ halal_travel_expert = Agent(
         + _TOOL_GUARDRAIL
     ),
     llm=llm,
+    tools=[web_search],
     verbose=True,
     allow_delegation=False,
     max_retry_limit=3,
@@ -65,6 +67,7 @@ digital_nomad_planner = Agent(
         + _TOOL_GUARDRAIL
     ),
     llm=llm,
+    tools=[web_search],
     verbose=True,
     allow_delegation=False,
     max_retry_limit=3,
@@ -133,12 +136,17 @@ luxury_on_budget_finder = Agent(
 # 8) Visa & Entry Requirements Checker
 visa_requirements_advisor = Agent(
     role="Visa & Entry Requirements Advisor",
-    goal="Explain visa and entry requirements for the traveller's passport and destination.",
+    goal="Provide ACCURATE, VERIFIED visa and entry requirements from official government sources only.",
     backstory=(
-        "Summarises visa and border rules. Always recommends verifying with official sources. "
+        "Expert in visa and border rules. CRITICAL: Always verify visa information from OFFICIAL government websites only. "
+        "Visa policies change frequently and vary by citizenship. NEVER assume or guess about visa policies. "
+        "If information cannot be verified from official government sources, clearly state that verification is needed and provide the official embassy/consulate website. "
+        "Always recommend users check the official destination country embassy/consulate website before traveling. "
+        "Be conservative: when in doubt, recommend official source verification rather than providing uncertain information. "
         + _TOOL_GUARDRAIL
     ),
     llm=llm,
+    tools=[web_search],
     verbose=True,
     allow_delegation=False,
     max_retry_limit=3,
@@ -149,10 +157,11 @@ flight_advisor = Agent(
     role="Flight & Travel Logistics Advisor",
     goal="Find flight options using search tools, or research flight info via web search if API fails.",
     backstory=(
-        "Experienced flight planner. You have THREE tools: 'search_flights_oneway', 'search_flights_roundtrip', and 'Search the internet'. "
-        "ALWAYS try the flight search tools first. If they return no results or an error, "
-        "use 'Search the internet' to research airlines, prices, and booking tips for the route. "
-        "Never give up without trying web search as backup."
+        "Experienced flight planner. You have access to flight search tools and web search. "
+        "ALWAYS try the flight search tools first (search_flights_oneway, search_flights_roundtrip). "
+        "If they return no results or errors, use 'Search the internet' to research airlines, prices, booking tips. "
+        "Never give up without trying web search as backup. "
+        + _TOOL_GUARDRAIL
     ),
     llm=llm,
     tools=BOOKING_TOOLS,

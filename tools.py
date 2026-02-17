@@ -12,17 +12,11 @@ from services.flights import search_flights_oneway, search_flights_roundtrip, fo
 load_dotenv()
 
 # =====================================================
-# 1) REAL CREWAI TOOL: WEB SEARCH (SERPER)
+# 1) WEB SEARCH TOOL - Using SerperDevTool directly
 # =====================================================
 
-serper_api_key = os.getenv("SERPER_API_KEY")
-
-web_search = SerperDevTool(
-    # n_results=10,
-    # search_type="search",
-    # api_key=serper_api_key,
-    # save_file=False,
-)
+# Create web search tool - uses SERPER_API_KEY from env
+web_search = SerperDevTool()
 
 # =====================================================
 # CUSTOM CREWAI TOOLS: FLIGHT SEARCH

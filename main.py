@@ -32,6 +32,7 @@ def run_cli():
     destination = input("Destination (e.g. Paris, France): ")
     budget = float(input("Total budget in USD (e.g. 2500): "))
     days = int(input("Number of days (e.g. 5): "))
+    start_date = input("Start date (YYYY-MM-DD, e.g. 2024-06-15): ")
     interests = input("Interests (e.g. food, culture, nightlife): ")
 
     print("\nNiche flags (y/n):")
@@ -73,6 +74,7 @@ def run_cli():
         interests,
         traveller_type,
         raw_preferences,
+        start_date,
     )
 
     core_final_task = core_tasks[-1]
