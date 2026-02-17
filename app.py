@@ -636,40 +636,6 @@ with tab1:
 
         st.markdown(CLOSING_DIV, unsafe_allow_html=True)
 
-    st.write("")
-    st.markdown("#### Optional Smooth Landing profile")
-    st.caption("Flip on the layers that help your arrival feel extra smooth and safe.")
-
-    col_n1, col_n2, col_n3 = st.columns(3)
-    with col_n1:
-        new_safari = st.toggle("Safari / East Africa", key="new_safari")
-        new_halal = st.toggle("Halal‑friendly", key="new_halal")
-    with col_n2:
-        new_nomad = st.toggle("Digital nomad", key="new_nomad")
-        new_solo_f = st.toggle("Solo female safety", key="new_solo_f")
-    with col_n3:
-        # Hide family option when solo female travel is selected
-        if not new_solo_f:
-            new_family = st.toggle("Family with kids", key="new_family")
-        else:
-            new_family = False
-        new_medical = st.toggle("Medical tourism", key="new_medical")
-    new_luxury = st.toggle("Luxury on a budget", key="new_luxury")
-    new_visa = st.toggle("Visa & entry requirements", key="new_visa")
-    new_flights = st.toggle("Flight advisor", key="new_flights")
-
-    profile_flags = {
-        "safari": new_safari,
-        "halal": new_halal,
-        "nomad": new_nomad,
-        "solo_female": new_solo_f,
-        "family": new_family,
-        "medical": new_medical,
-        "luxury": new_luxury,
-        "visa": new_visa,
-        "flights": new_flights,
-    }
-
     st.markdown("---")
 
     # Initialize session state for core and niche itineraries
@@ -743,13 +709,71 @@ with tab1:
     )
     st.markdown(CLOSING_DIV, unsafe_allow_html=True)
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # OVERLAYS SECTION — only show after core itinerary exists
+    # ─────────────────────────────────────────────────────────────────────────
     st.markdown("### Add Smooth Landing overlays")
-    st.caption("Run a lighter pass to add extra calm – safety, halal options, family tweaks, visa notes and more.")
+    
+    if not st.session_state.core_itinerary.strip():
+        st.info("Generate a core itinerary first, then come back here to add overlays.")
+        # Default profile flags when no itinerary yet
+        profile_flags = {
+            "safari": False, "halal": False, "nomad": False, "solo_female": False,
+            "family": False, "medical": False, "luxury": False, "visa": False, "flights": False,
+        }
+    else:
+        st.caption("Now that you have a plan, pick the overlays that fit your style.")
+        
+        # Check if solo traveller (hide family/group options)
+        is_solo = new_traveller_type in ["solo female", "solo"]
+        
+        # Check if African destination (for Safari option)
+        african_keywords = [
+            "kenya", "tanzania", "south africa", "botswana", "namibia", "zambia", "zimbabwe",
+            "uganda", "rwanda", "ethiopia", "malawi", "mozambique", "madagascar", "mauritius",
+            "seychelles", "zanzibar", "serengeti", "masai mara", "kruger", "okavango", "victoria falls",
+            "nairobi", "cape town", "johannesburg", "dar es salaam", "kilimanjaro", "entebbe", "kigali",
+            "addis ababa", "lusaka", "harare", "windhoek", "gaborone", "maputo", "antananarivo",
+            "mombasa", "arusha", "livingstone", "maun", "kasane"
+        ]
+        dest_lower = new_destination.lower()
+        is_african = any(kw in dest_lower for kw in african_keywords)
+        
+        col_n1, col_n2, col_n3 = st.columns(3)
+        with col_n1:
+            # Only show Safari toggle for African destinations
+            if is_african:
+                new_safari = st.toggle("Safari / East Africa", key="new_safari")
+            else:
+                new_safari = False
+            new_halal = st.toggle("Halal‑friendly", key="new_halal")
+        with col_n2:
+            new_nomad = st.toggle("Digital nomad", key="new_nomad")
+            new_solo_f = st.toggle("Solo female safety", key="new_solo_f")
+        with col_n3:
+            # Hide family option when solo travel is selected
+            if not is_solo and not new_solo_f:
+                new_family = st.toggle("Family with kids", key="new_family")
+            else:
+                new_family = False
+            new_medical = st.toggle("Medical tourism", key="new_medical")
+        new_luxury = st.toggle("Luxury on a budget", key="new_luxury")
+        new_visa = st.toggle("Visa & entry requirements", key="new_visa")
+        new_flights = st.toggle("Flight advisor", key="new_flights")
 
-    if st.button("Run overlays on this itinerary", key="btn_niche", use_container_width=True):
-        if not st.session_state.core_itinerary.strip():
-            st.error("Generate or paste a core itinerary first.")
-        else:
+        profile_flags = {
+            "safari": new_safari,
+            "halal": new_halal,
+            "nomad": new_nomad,
+            "solo_female": new_solo_f,
+            "family": new_family,
+            "medical": new_medical,
+            "luxury": new_luxury,
+            "visa": new_visa,
+            "flights": new_flights,
+        }
+
+        if st.button("Run overlays on this itinerary", key="btn_niche", use_container_width=True):
             _run_niche_overlays(
                 new_destination,
                 new_budget,

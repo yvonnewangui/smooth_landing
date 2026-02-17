@@ -232,15 +232,15 @@ def build_niche_tasks(
         niche_tasks.append(
             Task(
                 description=(
-                    f"Flights: {home_airport} → {dest_iata} ({days}d from {start_date}, ${budget} USD). "
-                    f"Current date/time: {_now}. Do NOT recommend flights that have already departed. "
-                    f"If start_date is today and it is evening, search from tomorrow instead. "
-                    f"Use IATA codes only (e.g. NBO, DPS) — never city names. "
-                    f"Only show real results from the search tool. Do NOT invent airlines, times or prices. "
-                    f"If no results, say 'No flights found — check Skyscanner directly.'"
+                    f"Find flights: {home_airport} → {dest_iata}, departing around {start_date}, budget ${budget} USD. "
+                    f"Current date: {_now}. "
+                    f"STEP 1: Call search_flights_oneway with origin='{home_airport}', destination='{dest_iata}', date='{start_date}'. "
+                    f"STEP 2: If step 1 returns empty, error, or no useful results, MUST call 'Search the internet' with query like "
+                    f"'flights from {home_airport} to {dest_iata} airlines prices'. "
+                    f"Provide: airlines serving this route, typical price range, flight duration, and links to Skyscanner/Google Flights."
                 ),
                 agent=flight_advisor,
-                expected_output="Flight options from search tool with real data only. No fabricated flights.",
+                expected_output="Flight options from API, OR web-searched route info with airlines, prices, duration, and booking links.",
             )
         )
 

@@ -41,7 +41,9 @@ def build_core_tasks(
     fly_note = "(Will fly in/out)" if will_fly else ""
     research_task = Task(
         description=(
-            f"Research {destination} {fly_note}: safety, neighborhoods, costs, transport, weather."
+            f"Research {destination} {fly_note}: safety, neighborhoods, costs, transport, weather. "
+            "Use the 'Search the internet' tool for web searches. "
+            "Do NOT call brave_search or any tool not in your tools list."
         ),
         agent=destination_researcher,
         context=[profile_task],
@@ -83,11 +85,23 @@ def build_core_tasks(
     # 6) Coordination (whole-trip shaping)
     coordination_task = Task(
         description=(
-            "Organize into Day 1, Day 2... format. Include: stay, activities, transport, times, safety. Cluster nearby activities. Keep realistic pace (no >12hr days, no late returns). All costs in USD. Output markdown only."
+            "Organize the trip into a clear day-by-day plan. Cluster nearby activities. Keep realistic pace (no >12hr days). All costs in USD. "
+            "Output as SEPARATE MARKDOWN TABLES for each day. Example:\n\n"
+            "## Day 1\n"
+            "| Time | Activity | Location | Transport | Notes |\n"
+            "|------|----------|----------|-----------|-------|\n"
+            "| 9:00 AM | Visit Museum | Downtown | Taxi | History |\n"
+            "| 12:00 PM | Lunch | Old Town | Walk | Local food |\n"
+            "| 3:00 PM | Beach | Coast | Uber | Relax |\n\n"
+            "## Day 2\n"
+            "| Time | Activity | Location | Transport | Notes |\n"
+            "|------|----------|----------|-----------|-------|\n"
+            "| 10:00 AM | Market | City center | Metro | Shopping |\n\n"
+            "Create one heading (## Day X) and one table per day. Every row must have an activity."
         ),
         agent=itinerary_coordinator,
         context=[research_task, accommodation_task, activities_task, transport_task],
-        expected_output="Day-by-day itinerary in markdown. Each day: stay | activities | transport | times | safety notes. All costs in USD."
+        expected_output="Separate markdown table for each day with heading. Columns: Time | Activity | Location | Transport | Notes."
     )
 
     # 7) Verification (scores + light edits)
@@ -103,11 +117,14 @@ def build_core_tasks(
     # 8) Local insights & final client format
     local_insights_task = Task(
         description=(
-            f"Polish itinerary for {destination} ({days}d, ${budget} USD). Add: trip snapshot, safety tips, budget breakdown in USD, local hacks. All costs must be in USD. Markdown only."
+            f"Polish itinerary for {destination} ({days}d, ${budget} USD). "
+            "Add: trip snapshot at top, safety tips, budget breakdown in USD, local hacks. "
+            "Keep daily plan as SEPARATE TABLES per day (## Day X heading, then table with Time | Activity | Location | Transport | Notes). "
+            "All costs in USD."
         ),
         agent=local_insider,
         context=[verification_task],
-        expected_output="Final polished itinerary: snapshot, safety, daily plan, budget breakdown in USD, tips. Markdown."
+        expected_output="Final itinerary with: snapshot, safety, separate table per day, budget, tips."
     )
 
     return [

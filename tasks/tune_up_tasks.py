@@ -72,7 +72,7 @@ def build_tune_up_tasks(
         "2) Suggest specific, concrete improvements (not generic advice).\n\n"
         "OUTPUT FORMAT:\n"
         "### TUNED ITINERARY (DRAFT)\n"
-        "[Improved but still recognisably similar itinerary, in day-by-day bullets]\n\n"
+        "[Separate table per day: ## Day X heading, then table with Time | Activity | Location | Transport | Notes]\n\n"
         "### ISSUES FOUND\n"
         "- [Issue 1]\n"
         "- [Issue 2]\n\n"
@@ -103,7 +103,7 @@ def build_tune_up_tasks(
         "- Keep the day-by-day section concise and skimmable.\n\n"
         "OUTPUT FORMAT:\n"
         "### TRAVEL NINJA ITINERARY\n"
-        "[Client-ready, day-by-day itinerary, with dates if helpful]\n\n"
+        "[Separate table per day: ## Day X heading, then table with Time | Activity | Location | Transport | Notes]\n\n"
         "### SAFETY & COMFORT SUMMARY\n"
         "[3–5 sentences]\n"
     )
